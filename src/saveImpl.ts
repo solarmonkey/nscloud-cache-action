@@ -65,7 +65,6 @@ async function saveImpl(stateProvider: IStateProvider): Promise<void> {
     } catch (error: unknown) {
         utils.logWarning((error as Error).message);
     }
-    return cacheId;
 }
 
 export default saveImpl;
