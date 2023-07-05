@@ -41,7 +41,10 @@ async function restoreImpl(
             cachePaths,
             primaryKey,
             restoreKeys,
-            { lookupOnly: lookupOnly },
+            {
+                lookupOnly: lookupOnly,
+                downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
+            },
             enableCrossOsArchive
         );
 

@@ -59,7 +59,10 @@ async function saveImpl(stateProvider: IStateProvider): Promise<void> {
         await cache.saveCache(
             cachePaths,
             primaryKey,
-            { uploadChunkSize: utils.getInputAsInt(Inputs.UploadChunkSize) },
+            {
+                uploadChunkSize: utils.getInputAsInt(Inputs.UploadChunkSize),
+                uploadConcurrency: utils.envNumber('CACHE_UPLOAD_CONCURRENCY'),
+            },
             enableCrossOsArchive
         );
     } catch (error: unknown) {

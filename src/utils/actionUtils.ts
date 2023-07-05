@@ -78,3 +78,10 @@ Otherwise please upgrade to GHES version >= 3.5 and If you are also using Github
     );
     return false;
 }
+
+export function envNumber(key: string): number|undefined {
+    const s = process.env[key];
+    if (s != null) {
+        return Number(s)
+    }
+}
