@@ -2147,7 +2147,7 @@ function saveCache(paths, key, options, enableCrossOsArchive = false) {
         checkPaths(paths);
         checkKey(key);
         const compressionMethod = yield utils.getCompressionMethod();
-        let cacheId = "";
+        let cacheId = '';
         const cachePaths = yield utils.resolvePaths(paths);
         core.debug('Cache Paths:');
         core.debug(`${JSON.stringify(cachePaths)}`);
@@ -2180,7 +2180,7 @@ function saveCache(paths, key, options, enableCrossOsArchive = false) {
                 throw new ReserveCacheError(`Unable to reserve cache with key ${key}, another job may be creating this cache. More details: ${(_e = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.error) === null || _e === void 0 ? void 0 : _e.message}`);
             }
             core.debug(`Saving Cache (ID: ${cacheId})`);
-            yield cacheHttpClient.saveCache(cacheId, archivePath, options);
+            yield cacheHttpClient.saveCache(cacheId, archivePath, reserveCacheResponse.result.uploadUrls, options);
         }
         catch (error) {
             const typedError = error;
@@ -2256,7 +2256,8 @@ const options_1 = __nccwpck_require__(5159);
 const requestUtils_1 = __nccwpck_require__(7577);
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    const baseUrl = process.env['NAMESPACE_CACHE_URL'] || 'https://cache.github-services.staging-fra1.nscluster.cloud/';
+    const baseUrl = process.env['NAMESPACE_CACHE_URL'] ||
+        'https://cache.github-services.fra1.nscluster.cloud/';
     if (!baseUrl) {
         throw new Error('Cache Service Url not found, unable to restore cache.');
     }
@@ -2279,7 +2280,7 @@ function createHttpClient() {
     if (process.env['NSC_TOKEN_FILE'] == null) {
         throw new Error(`Missing $NSC_TOKEN_FILE`);
     }
-    const tokenJSON = fs.readFileSync(process.env['NSC_TOKEN_FILE'], "utf8");
+    const tokenJSON = fs.readFileSync(process.env['NSC_TOKEN_FILE'], 'utf8');
     const token = JSON.parse(tokenJSON).bearer_token;
     const bearerCredentialHandler = new auth_1.BearerCredentialHandler(token);
     return new http_client_1.HttpClient('actions/cache', [bearerCredentialHandler], getRequestOptions());
@@ -2353,7 +2354,7 @@ function downloadCache(archiveLocation, archivePath, archiveSize, options) {
     return __awaiter(this, void 0, void 0, function* () {
         const downloadOptions = options_1.getDownloadOptions(options);
         if (downloadOptions.downloadConcurrency > 1) {
-            yield downloadUtils_1.downloadCacheParallel(archiveLocation, archivePath, archiveSize, downloadOptions.downloadConcurrency);
+            yield downloadUtils_1.downloadCacheConcurrent(archiveLocation, archivePath, archiveSize, downloadOptions.downloadConcurrency);
         }
         else {
             // Otherwise, download using the Actions http-client.
@@ -2387,7 +2388,7 @@ function getContentRange(start, end) {
     // Content-Range: bytes 0-199/*
     return `bytes ${start}-${end}/*`;
 }
-function uploadChunk(httpClient, resourceUrl, openStream, start, end, chunkNo) {
+function uploadChunk(httpClient, resourceUrl, openStream, start, end, chunkNo, signal) {
     return __awaiter(this, void 0, void 0, function* () {
         core.debug(`Uploading chunk of size ${end -
             start +
@@ -2396,11 +2397,11 @@ function uploadChunk(httpClient, resourceUrl, openStream, start, end, chunkNo) {
             'Content-Type': 'application/octet-stream',
             'Content-Length': end - start + 1,
             'Content-Range': getContentRange(start, end),
-            'NS-Chunk-No': chunkNo.toString(),
+            'NS-Chunk-No': chunkNo.toString()
         };
         const uploadChunkResponse = yield requestUtils_1.retryHttpClientResponse(`uploadChunk (start: ${start}, end: ${end})`, () => __awaiter(this, void 0, void 0, function* () {
             return httpClient.sendStream('PATCH', resourceUrl, openStream(), additionalHeaders);
-        }));
+        }), { signal });
         // Avoid leaking the response handle.
         // Otherwise this connection keeps the process hanging after completion.
         yield uploadChunkResponse.readBody();
@@ -2422,35 +2423,113 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
         const uploadOptions = options_1.getUploadOptions(options);
         const concurrency = utils.assertDefined('uploadConcurrency', uploadOptions.uploadConcurrency);
         const maxChunkSize = utils.assertDefined('uploadChunkSize', uploadOptions.uploadChunkSize);
+        const abort = new AbortController();
         const parallelUploads = [...new Array(concurrency).keys()];
         core.debug('Awaiting all uploads');
         let offset = 0, nextChunk = 0;
         const etags = [];
+        const uploads = parallelUploads.map(() => __awaiter(this, void 0, void 0, function* () {
+            while (offset < fileSize) {
+                const chunkSize = Math.min(fileSize - offset, maxChunkSize);
+                const start = offset;
+                const end = offset + chunkSize - 1;
+                const chunkNo = nextChunk;
+                offset += maxChunkSize;
+                nextChunk += 1;
+                const etag = yield uploadChunk(httpClient, resourceUrl, () => fs
+                    .createReadStream(archivePath, {
+                    fd,
+                    start,
+                    end,
+                    autoClose: false
+                })
+                    .on('error', error => {
+                    throw new Error(`Cache upload failed because file read failed with ${error.message}`);
+                }), start, end, chunkNo, abort.signal);
+                etags[chunkNo] = etag;
+            }
+        }));
+        // Only close fd once HTTP communication finishes.
+        // Closing the file confuses httpClient (it doesn't abort the requests and they hang).
+        Promise.allSettled(uploads).then(() => {
+            fs.closeSync(fd);
+        });
         try {
-            yield Promise.all(parallelUploads.map(() => __awaiter(this, void 0, void 0, function* () {
-                while (offset < fileSize) {
-                    const chunkSize = Math.min(fileSize - offset, maxChunkSize);
-                    const start = offset;
-                    const end = offset + chunkSize - 1;
-                    const chunkNo = nextChunk;
-                    offset += maxChunkSize;
-                    nextChunk += 1;
-                    const etag = yield uploadChunk(httpClient, resourceUrl, () => fs
-                        .createReadStream(archivePath, {
-                        fd,
-                        start,
-                        end,
-                        autoClose: false
-                    })
-                        .on('error', error => {
-                        throw new Error(`Cache upload failed because file read failed with ${error.message}`);
-                    }), start, end, chunkNo);
-                    etags[chunkNo] = etag;
-                }
-            })));
+            yield Promise.all(uploads);
         }
         finally {
+            abort.abort();
+        }
+        return etags;
+    });
+}
+function uploadChunkToUrl(httpClient, resourceUrl, chunkNo, length, openStream, signal) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const additionalHeaders = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': length
+        };
+        const uploadChunkResponse = yield requestUtils_1.retryHttpClientResponse(`uploadChunk #${chunkNo}`, () => __awaiter(this, void 0, void 0, function* () {
+            return httpClient.sendStream('PUT', resourceUrl, openStream(), additionalHeaders);
+        }), { signal });
+        // Avoid leaking the response handle.
+        // Otherwise this connection keeps the process hanging after completion.
+        yield uploadChunkResponse.readBody();
+        if (!requestUtils_1.isSuccessStatusCode(uploadChunkResponse.message.statusCode)) {
+            throw new Error(`Cache service responded with ${uploadChunkResponse.message.statusCode} during upload chunk.`);
+        }
+        if (uploadChunkResponse.message.headers.etag == null) {
+            throw new Error(`Cache service response misses ETag during upload chunk.`);
+        }
+        return uploadChunkResponse.message.headers.etag;
+    });
+}
+function uploadFileToUrls(uploadUrls, archivePath, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const httpClient = new http_client_1.HttpClient('actions/cache');
+        const uploadOptions = options_1.getUploadOptions(options);
+        const concurrency = utils.assertDefined('uploadConcurrency', uploadOptions.uploadConcurrency);
+        const preferredChunkSize = utils.assertDefined('uploadChunkSize', uploadOptions.uploadChunkSize);
+        const fileSize = utils.getArchiveFileSizeInBytes(archivePath);
+        const fd = fs.openSync(archivePath, 'r');
+        const parallelUploads = [...new Array(concurrency).keys()];
+        core.debug('Awaiting all uploads');
+        const maxChunkSize = Math.max(preferredChunkSize, Math.ceil(fileSize / uploadUrls.length));
+        const abort = new AbortController();
+        let offset = 0, nextChunk = 0;
+        const etags = [];
+        const uploads = parallelUploads.map(() => __awaiter(this, void 0, void 0, function* () {
+            while (offset < fileSize) {
+                const chunkNo = nextChunk;
+                const chunkUrl = uploadUrls[chunkNo];
+                const chunkSize = Math.min(fileSize - offset, maxChunkSize);
+                const start = offset;
+                const end = offset + chunkSize - 1;
+                offset += maxChunkSize;
+                nextChunk += 1;
+                core.debug(`Uploading chunk ${chunkNo} (${start}-${end}) to ${chunkUrl}`);
+                const etag = yield uploadChunkToUrl(httpClient, chunkUrl, chunkNo, chunkSize, () => fs
+                    .createReadStream(archivePath, {
+                    fd,
+                    start,
+                    end,
+                    autoClose: false
+                })
+                    .on('error', error => {
+                    throw new Error(`Cache upload failed because file read failed with ${error.message} ${error}`);
+                }), abort.signal);
+                etags[chunkNo] = etag;
+            }
+        }));
+        Promise.allSettled(uploads).then(() => {
             fs.closeSync(fd);
+        });
+        try {
+            yield Promise.all(uploads);
+        }
+        finally {
+            // Store retrying. HTTP client is not abortable.
+            abort.abort();
         }
         return etags;
     });
@@ -2463,11 +2542,12 @@ function commitCache(httpClient, cacheId, filesize, etags) {
         }));
     });
 }
-function saveCache(cacheId, archivePath, options) {
+function saveCache(cacheId, archivePath, uploadUrls, options) {
     return __awaiter(this, void 0, void 0, function* () {
         const httpClient = createHttpClient();
         core.debug('Upload cache');
-        const etags = yield uploadFile(httpClient, cacheId, archivePath, options);
+        const etags = (uploadUrls === null || uploadUrls === void 0 ? void 0 : uploadUrls.length) ? yield uploadFileToUrls(uploadUrls, archivePath, options)
+            : yield uploadFile(httpClient, cacheId, archivePath, options);
         // Commit Cache
         core.debug('Commiting cache');
         const cacheSize = utils.getArchiveFileSizeInBytes(archivePath);
@@ -2776,7 +2856,7 @@ var __asyncGenerator = (this && this.__asyncGenerator) || function (thisArg, _ar
     function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.downloadCacheParallel = exports.downloadCacheHttpClient = exports.DownloadProgress = void 0;
+exports.downloadCacheConcurrent = exports.downloadCacheHttpClient = exports.DownloadProgress = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const fs = __importStar(__nccwpck_require__(7147));
@@ -2926,7 +3006,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
     });
 }
 exports.downloadCacheHttpClient = downloadCacheHttpClient;
-function downloadCacheParallel(archiveLocation, archivePath, archiveSize, concurrency) {
+function downloadCacheConcurrent(archiveLocation, archivePath, archiveSize, concurrency) {
     return __awaiter(this, void 0, void 0, function* () {
         const fd = yield fsPromises.open(archivePath, 'w');
         yield fd.truncate(archiveSize);
@@ -2957,7 +3037,7 @@ function downloadCacheParallel(archiveLocation, archivePath, archiveSize, concur
         }
     });
 }
-exports.downloadCacheParallel = downloadCacheParallel;
+exports.downloadCacheConcurrent = downloadCacheConcurrent;
 //# sourceMappingURL=downloadUtils.js.map
 
 /***/ }),
@@ -3000,6 +3080,7 @@ exports.retryHttpClientResponse = exports.retryTypedResponse = exports.retry = e
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const constants_1 = __nccwpck_require__(6683);
+const promises_1 = __nccwpck_require__(8670);
 function isSuccessStatusCode(statusCode) {
     if (!statusCode) {
         return false;
@@ -3026,16 +3107,11 @@ function isRetryableStatusCode(statusCode) {
     return retryableStatusCodes.includes(statusCode);
 }
 exports.isRetryableStatusCode = isRetryableStatusCode;
-function sleep(milliseconds) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return new Promise(resolve => setTimeout(resolve, milliseconds));
-    });
-}
-function retry(name, method, getStatusCode, maxAttempts = constants_1.DefaultRetryAttempts, delay = constants_1.DefaultRetryDelay, onError = undefined) {
+function retry(name, method, getStatusCode, maxAttempts = constants_1.DefaultRetryAttempts, delay = constants_1.DefaultRetryDelay, onError = undefined, signal) {
     return __awaiter(this, void 0, void 0, function* () {
         let errorMessage = '';
         let attempt = 1;
-        while (attempt <= maxAttempts) {
+        while (attempt <= maxAttempts && !(signal === null || signal === void 0 ? void 0 : signal.aborted)) {
             let response = undefined;
             let statusCode = undefined;
             let isRetryable = false;
@@ -3064,14 +3140,14 @@ function retry(name, method, getStatusCode, maxAttempts = constants_1.DefaultRet
                 core.debug(`${name} - Error is not retryable`);
                 break;
             }
-            yield sleep(delay);
+            yield promises_1.setTimeout(delay, null, { signal });
             attempt++;
         }
         throw Error(`${name} failed: ${errorMessage}`);
     });
 }
 exports.retry = retry;
-function retryTypedResponse(name, method, maxAttempts = constants_1.DefaultRetryAttempts, delay = constants_1.DefaultRetryDelay) {
+function retryTypedResponse(name, method, { maxAttempts = constants_1.DefaultRetryAttempts, delay = constants_1.DefaultRetryDelay, signal = undefined } = {}) {
     return __awaiter(this, void 0, void 0, function* () {
         return yield retry(name, method, (response) => response.statusCode, maxAttempts, delay, 
         // If the error object contains the statusCode property, extract it and return
@@ -3088,13 +3164,13 @@ function retryTypedResponse(name, method, maxAttempts = constants_1.DefaultRetry
             else {
                 return undefined;
             }
-        });
+        }, signal);
     });
 }
 exports.retryTypedResponse = retryTypedResponse;
-function retryHttpClientResponse(name, method, maxAttempts = constants_1.DefaultRetryAttempts, delay = constants_1.DefaultRetryDelay) {
+function retryHttpClientResponse(name, method, { maxAttempts = constants_1.DefaultRetryAttempts, delay = constants_1.DefaultRetryDelay, signal = undefined } = {}) {
     return __awaiter(this, void 0, void 0, function* () {
-        return yield retry(name, method, (response) => response.message.statusCode, maxAttempts, delay);
+        return yield retry(name, method, (response) => response.message.statusCode, maxAttempts, delay, undefined, signal);
     });
 }
 exports.retryHttpClientResponse = retryHttpClientResponse;
@@ -7417,7 +7493,7 @@ class HttpClient {
             req.write(data, 'utf8');
         }
         if (data && typeof data !== 'string') {
-            data.on('close', function () {
+            data.on('end', function () {
                 req.end();
             });
             data.pipe(req);
@@ -10191,6 +10267,14 @@ module.exports = require("string_decoder");
 
 "use strict";
 module.exports = require("timers");
+
+/***/ }),
+
+/***/ 8670:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("timers/promises");
 
 /***/ }),
 
