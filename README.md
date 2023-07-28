@@ -121,7 +121,7 @@ jobs:
 
     - name: Restore cached Primes
       id: cache-primes-restore
-      uses: namespacelabs/nscloud-cache-action@v0
+      uses: namespacelabs/nscloud-cache-action/restore@v0
       with:
         path: |
           path/to/dependencies
@@ -132,7 +132,7 @@ jobs:
     .
     - name: Save Primes
       id: cache-primes-save
-      uses: namespacelabs/nscloud-cache-action@v0
+      uses: namespacelabs/nscloud-cache-action/save@v0
       with:
         path: |
           path/to/dependencies
