@@ -9960,7 +9960,7 @@ function restoreImpl(stateProvider) {
             const localCache = utils.getInputAsBool(constants_1.Inputs.LocalCache);
             let cacheKey;
             if (localCache) {
-                core.warning(`Use Namespace local cache.`);
+                core.info(`Use Namespace local cache.`);
                 const localCachePath = utils.nscCachePath();
                 if (localCachePath === "") {
                     core.warning(`GitHub runner does not have Namespace cross-invocation cache.`);
@@ -10202,9 +10202,10 @@ function restoreLocalCache(localCachePath, cachePath, primaryKey) {
         const localCachePathKey = path.join(localCachePath, primaryKey);
         const cacheHit = fs.existsSync(localCachePathKey);
         for (const p of cachePath) {
-            const fileCachedPath = path.join(localCachePathKey, p);
-            yield exec.exec(`mkdir -p ${fileCachedPath} ${p}`);
-            yield exec.exec(`sudo mount --bind ${fileCachedPath} ${p}`);
+            const expandedFilePath = resolveHome(p);
+            const fileCachedPath = path.join(localCachePathKey, expandedFilePath);
+            yield exec.exec(`mkdir -p ${fileCachedPath} ${expandedFilePath}`);
+            yield exec.exec(`sudo mount --bind ${fileCachedPath} ${expandedFilePath}`);
         }
         if (cacheHit) {
             return primaryKey;
@@ -10212,6 +10213,11 @@ function restoreLocalCache(localCachePath, cachePath, primaryKey) {
     });
 }
 exports.restoreLocalCache = restoreLocalCache;
+function resolveHome(filepath) {
+    // Ugly, but should work
+    const home = process.env["HOME"] || "~/";
+    return filepath.replace("~/", home);
+}
 
 
 /***/ }),

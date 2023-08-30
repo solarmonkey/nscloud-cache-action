@@ -43,7 +43,7 @@ async function restoreImpl(
         let cacheKey: string | undefined;
 
         if (localCache) {
-            core.warning(`Use Namespace local cache.`);
+            core.info(`Use Namespace local cache.`);
             const localCachePath = utils.nscCachePath();
             if (localCachePath === "") {
                 core.warning(

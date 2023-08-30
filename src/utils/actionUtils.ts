@@ -103,12 +103,21 @@ export async function restoreLocalCache(
     const cacheHit = fs.existsSync(localCachePathKey);
 
     for (const p of cachePath) {
-        const fileCachedPath = path.join(localCachePathKey, p);
-        await exec.exec(`mkdir -p ${fileCachedPath} ${p}`);
-        await exec.exec(`sudo mount --bind ${fileCachedPath} ${p}`);
+        const expandedFilePath = resolveHome(p);
+        const fileCachedPath = path.join(localCachePathKey, expandedFilePath);
+        await exec.exec(`mkdir -p ${fileCachedPath} ${expandedFilePath}`);
+        await exec.exec(
+            `sudo mount --bind ${fileCachedPath} ${expandedFilePath}`
+        );
     }
 
     if (cacheHit) {
         return primaryKey;
     }
+}
+
+function resolveHome(filepath: string): string {
+    // Ugly, but should work
+    const home = process.env["HOME"] || "~/";
+    return filepath.replace("~/", home);
 }
