@@ -6,7 +6,7 @@ This action allows caching dependencies and build outputs to improve workflow ex
 >* [Restore action](./restore/README.md)
 >* [Save action](./save/README.md)
 
-[![Tests](https://github.com/actions/cache/actions/workflows/workflow.yml/badge.svg)](https://github.com/actions/cache/actions/workflows/workflow.yml)
+[![Tests](https://github.com/namespacelabs/nscloud-cache-action/actions/workflows/workflow.yml/badge.svg)](https://github.com/namespacelabs/nscloud-cache-action/actions/workflows/workflow.yml)
 
 ## Documentation
 
@@ -33,7 +33,7 @@ See ["Caching dependencies to speed up workflows"](https://docs.github.com/en/ac
 * Added option to lookup cache without downloading it.
 * Reduced segment size to 128MB and segment timeout to 10 minutes to fail fast in case the cache download is stuck.
 
-See the [v2 README.md](https://github.com/actions/cache/blob/v2/README.md) for older updates.
+See the [v2 README.md](https://github.com/namespacelabs/nscloud-cache-action/blob/v2/README.md) for older updates.
 
 ## Usage
 
@@ -43,7 +43,7 @@ Create a workflow `.yml` file in your repository's `.github/workflows` directory
 
 If you are using this inside a container, a POSIX-compliant `tar` needs to be included and accessible from the execution path.
 
-If you are using a `self-hosted` Windows runner, `GNU tar` and `zstd` are required for [Cross-OS caching](https://github.com/actions/cache/blob/main/tips-and-workarounds.md#cross-os-cache) to work. They are also recommended to be installed in general so the performance is on par with `hosted` Windows runners.
+If you are using a `self-hosted` Windows runner, `GNU tar` and `zstd` are required for [Cross-OS caching](https://github.com/namespacelabs/nscloud-cache-action/blob/main/tips-and-workarounds.md#cross-os-cache) to work. They are also recommended to be installed in general so the performance is on par with `hosted` Windows runners.
 
 ### Inputs
 
@@ -56,7 +56,7 @@ If you are using a `self-hosted` Windows runner, `GNU tar` and `zstd` are requir
 
 #### Environment Variables
 
-* `SEGMENT_DOWNLOAD_TIMEOUT_MINS` - Segment download timeout (in minutes, default `10`) to abort download of the segment if not completed in the defined number of minutes. [Read more](https://github.com/actions/cache/blob/main/tips-and-workarounds.md#cache-segment-restore-timeout)
+* `SEGMENT_DOWNLOAD_TIMEOUT_MINS` - Segment download timeout (in minutes, default `10`) to abort download of the segment if not completed in the defined number of minutes. [Read more](https://github.com/namespacelabs/nscloud-cache-action/blob/main/tips-and-workarounds.md#cache-segment-restore-timeout)
 
 ### Outputs
 
@@ -151,7 +151,7 @@ With the introduction of the `restore` and `save` actions, a lot of caching use 
 
 Every programming language and framework has its own way of caching.
 
-See [Examples](examples.md) for a list of `actions/cache` implementations for use with:
+See [Examples](examples.md) for a list of `namespacelabs/nscloud-cache-action` implementations for use with:
 
 * [C# - NuGet](./examples.md#c---nuget)
 * [Clojure - Lein Deps](./examples.md#clojure---lein-deps)
@@ -186,7 +186,7 @@ A cache key can include any of the contexts, functions, literals, and operators 
 For example, using the [`hashFiles`](https://docs.github.com/en/actions/learn-github-actions/expressions#hashfiles) function allows you to create a new cache when dependencies change.
 
 ```yaml
-  - uses: actions/cache@v3
+  - uses: namespacelabs/nscloud-cache-action@v3
     with:
       path: |
         path/to/dependencies
@@ -204,7 +204,7 @@ Additionally, you can use arbitrary command output in a cache key, such as a dat
       echo "date=$(/bin/date -u "+%Y%m%d")" >> $GITHUB_OUTPUT
     shell: bash
 
-  - uses: actions/cache@v3
+  - uses: namespacelabs/nscloud-cache-action@v3
     with:
       path: path/to/dependencies
       key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('**/lockfiles') }}
@@ -226,7 +226,7 @@ Example:
 steps:
   - uses: actions/checkout@v3
 
-  - uses: actions/cache@v3
+  - uses: namespacelabs/nscloud-cache-action@v3
     id: cache
     with:
       path: path/to/dependencies
@@ -237,13 +237,13 @@ steps:
     run: /install.sh
 ```
 
-> **Note** The `id` defined in `actions/cache` must match the `id` in the `if` statement (i.e. `steps.[ID].outputs.cache-hit`)
+> **Note** The `id` defined in `namespacelabs/nscloud-cache-action` must match the `id` in the `if` statement (i.e. `steps.[ID].outputs.cache-hit`)
 
 ## Cache Version
 
 Cache version is a hash [generated](https://github.com/actions/toolkit/blob/500d0b42fee2552ae9eeb5933091fe2fbf14e72d/packages/cache/src/internal/cacheHttpClient.ts#L73-L90) for a combination of compression tool used (Gzip, Zstd, etc. based on the runner OS) and the `path` of directories being cached. If two caches have different versions, they are identified as unique caches while matching. This, for example, means that a cache created on a `windows-latest` runner can't be restored on `ubuntu-latest` as cache `Version`s are different.
 
-> Pro tip: The [list caches](https://docs.github.com/en/rest/actions/cache#list-github-actions-caches-for-a-repository) API can be used to get the version of a cache. This can be helpful to troubleshoot cache miss due to version.
+> Pro tip: The [list caches](https://docs.github.com/en/rest/namespacelabs/nscloud-cache-action#list-github-actions-caches-for-a-repository) API can be used to get the version of a cache. This can be helpful to troubleshoot cache miss due to version.
 
 <details>
   <summary>Example</summary>
@@ -258,7 +258,7 @@ jobs:
 
       - name: Cache Primes
         id: cache-primes
-        uses: actions/cache@v3
+        uses: namespacelabs/nscloud-cache-action@v3
         with:
           path: prime-numbers
           key: primes
@@ -269,7 +269,7 @@ jobs:
 
       - name: Cache Numbers
         id: cache-numbers
-        uses: actions/cache@v3
+        uses: namespacelabs/nscloud-cache-action@v3
         with:
           path: numbers
           key: primes
@@ -285,7 +285,7 @@ jobs:
 
       - name: Cache Primes
         id: cache-primes
-        uses: actions/cache@v3
+        uses: namespacelabs/nscloud-cache-action@v3
         with:
           path: prime-numbers
           key: primes
@@ -313,7 +313,7 @@ Please note that Windows environment variables (like `%LocalAppData%`) will NOT 
 
 ## Contributing
 
-We would love for you to contribute to `actions/cache`. Pull requests are welcome! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
+We would love for you to contribute to `namespacelabs/nscloud-cache-action`. Pull requests are welcome! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
 
 ## License
 

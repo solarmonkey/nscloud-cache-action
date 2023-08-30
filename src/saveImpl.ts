@@ -1,7 +1,7 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 
-import { Events, Inputs, State } from "./constants";
+import { Events, Inputs, State, LocalCacheEnabled } from "./constants";
 import { IStateProvider } from "./stateProvider";
 import * as utils from "./utils/actionUtils";
 
@@ -22,6 +22,16 @@ async function saveImpl(stateProvider: IStateProvider): Promise<void> {
                 `Event Validation Error: The event type ${
                     process.env[Events.Key]
                 } is not supported because it's not tied to a branch or tag ref.`
+            );
+            return;
+        }
+
+        // If local cache was used, then skip save step, as Namespace cache volume is committed automatically
+        // when workflow succeeds.
+        const localCache = stateProvider.getState(LocalCacheEnabled);
+        if (localCache) {
+            core.info(
+                `Namespace local cache is automatically committed. Skipping save step.`
             );
             return;
         }

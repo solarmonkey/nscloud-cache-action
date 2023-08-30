@@ -1,7 +1,10 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
+import * as exec from "@actions/exec";
+import * as fs from "fs";
+import * as path from "path";
 
-import { RefKey } from "../constants";
+import { RefKey, LocalCachePathKey } from "../constants";
 
 export function isGhes(): boolean {
     const ghUrl = new URL(
@@ -83,5 +86,29 @@ export function envNumber(key: string): number|undefined {
     const s = process.env[key];
     if (s != null) {
         return Number(s)
+    }
+}
+
+export function nscCachePath(): string {
+    return process.env[LocalCachePathKey] || "";
+}
+
+export async function restoreLocalCache(
+    localCachePath: string,
+    cachePath: string[],
+    primaryKey: string
+): Promise<string | undefined> {
+    // Check if localCachePath/primaryKey directory exists
+    const localCachePathKey = path.join(localCachePath, primaryKey);
+    const cacheHit = fs.existsSync(localCachePathKey);
+
+    for (const p of cachePath) {
+        const fileCachedPath = path.join(localCachePathKey, p);
+        await exec.exec(`mkdir -p ${fileCachedPath} ${p}`);
+        await exec.exec(`sudo mount --bind ${fileCachedPath} ${p}`);
+    }
+
+    if (cacheHit) {
+        return primaryKey;
     }
 }

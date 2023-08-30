@@ -5,7 +5,8 @@ export enum Inputs {
     UploadChunkSize = "upload-chunk-size", // Input for cache, save action
     EnableCrossOsArchive = "enableCrossOsArchive", // Input for cache, restore, save action
     FailOnCacheMiss = "fail-on-cache-miss", // Input for cache, restore action
-    LookupOnly = "lookup-only" // Input for cache, restore action
+    LookupOnly = "lookup-only", // Input for cache, restore action
+    LocalCache = "local-cache" // Input for cache, restore, save action
 }
 
 export enum Outputs {
@@ -26,3 +27,5 @@ export enum Events {
 }
 
 export const RefKey = "GITHUB_REF";
+export const LocalCachePathKey = "NSC_CACHE_PATH";
+export const LocalCacheEnabled = "NSC_CACHE_ENABLED";

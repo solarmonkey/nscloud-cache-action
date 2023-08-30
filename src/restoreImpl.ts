@@ -1,9 +1,11 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 
-import { Events, Inputs, Outputs, State } from "./constants";
+import { Events, Inputs, Outputs, State, LocalCacheEnabled } from "./constants";
 import { IStateProvider } from "./stateProvider";
 import * as utils from "./utils/actionUtils";
+import { constants } from "buffer";
+
 
 async function restoreImpl(
     stateProvider: IStateProvider
@@ -36,17 +38,43 @@ async function restoreImpl(
         );
         const failOnCacheMiss = utils.getInputAsBool(Inputs.FailOnCacheMiss);
         const lookupOnly = utils.getInputAsBool(Inputs.LookupOnly);
+        const localCache = utils.getInputAsBool(Inputs.LocalCache);
 
-        const cacheKey = await cache.restoreCache(
-            cachePaths,
-            primaryKey,
-            restoreKeys,
-            {
-                lookupOnly: lookupOnly,
-                downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
-            },
-            enableCrossOsArchive
-        );
+        let cacheKey: string | undefined;
+
+        if (localCache) {
+            const localCachePath = utils.nscCachePath();
+            if (localCachePath === "") {
+                core.info(
+                    `GitHub runner does not have Namespace cross-invocation cache.`
+                );
+                throw new Error(
+                    `Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?`
+                );
+            }
+
+            core.info(
+                `Found Namespace cross-invocation cache at ${localCachePath}.`
+            );
+
+            cacheKey = await utils.restoreLocalCache(
+                localCachePath,
+                cachePaths,
+                primaryKey
+            );
+            stateProvider.setState(LocalCacheEnabled, localCachePath);
+        } else {
+            cacheKey = await cache.restoreCache(
+                cachePaths,
+                primaryKey,
+                restoreKeys,
+                {
+                    lookupOnly: lookupOnly,
+                    downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
+                },
+                enableCrossOsArchive
+            );
+        }
 
         if (!cacheKey) {
             if (failOnCacheMiss) {

@@ -1,6 +1,6 @@
 name: 'Cache'
 description: 'Cache artifacts like dependencies and build outputs to improve workflow execution time'
-author: 'GitHub'
+author: 'Namespace Labs'
 inputs:
   path:
     description: 'A list of files, directories, and wildcard patterns to cache and restore'
@@ -8,6 +8,10 @@ inputs:
   key:
     description: 'An explicit key for restoring and saving the cache'
     required: true
+  local-cache:
+    description: 'An optional boolean, when enabled it uses the local cache mounted in Namespace Runner, instead of remote cache storage'
+    default: 'false'
+    required: false
   restore-keys:
     description: 'An ordered list of keys to use for restoring stale cache if no cache hit occurred for key. Note `cache-hit` returns false in this case.'
     required: false
