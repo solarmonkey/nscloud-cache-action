@@ -7493,7 +7493,7 @@ class HttpClient {
             req.write(data, 'utf8');
         }
         if (data && typeof data !== 'string') {
-            data.on('end', function () {
+            data.on('close', function () {
                 req.end();
             });
             data.pipe(req);
@@ -9827,7 +9827,7 @@ exports.debug = debug; // for test
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.RefKey = exports.Events = exports.State = exports.Outputs = exports.Inputs = void 0;
+exports.LocalCacheEnabled = exports.LocalCachePathKey = exports.RefKey = exports.Events = exports.State = exports.Outputs = exports.Inputs = void 0;
 var Inputs;
 (function (Inputs) {
     Inputs["Key"] = "key";
@@ -9836,7 +9836,8 @@ var Inputs;
     Inputs["UploadChunkSize"] = "upload-chunk-size";
     Inputs["EnableCrossOsArchive"] = "enableCrossOsArchive";
     Inputs["FailOnCacheMiss"] = "fail-on-cache-miss";
-    Inputs["LookupOnly"] = "lookup-only"; // Input for cache, restore action
+    Inputs["LookupOnly"] = "lookup-only";
+    Inputs["LocalCache"] = "local-cache"; // Input for cache, restore action
 })(Inputs = exports.Inputs || (exports.Inputs = {}));
 var Outputs;
 (function (Outputs) {
@@ -9856,6 +9857,8 @@ var Events;
     Events["PullRequest"] = "pull_request";
 })(Events = exports.Events || (exports.Events = {}));
 exports.RefKey = "GITHUB_REF";
+exports.LocalCachePathKey = "NSC_CACHE_PATH";
+exports.LocalCacheEnabled = "NSC_CACHE_ENABLED";
 
 
 /***/ }),
@@ -9946,6 +9949,13 @@ function saveImpl(stateProvider) {
             }
             if (!utils.isValidEvent()) {
                 utils.logWarning(`Event Validation Error: The event type ${process.env[constants_1.Events.Key]} is not supported because it's not tied to a branch or tag ref.`);
+                return;
+            }
+            // If local cache was used, then skip save step, as Namespace cache volume is committed automatically
+            // when workflow succeeds.
+            const localCache = stateProvider.getState(constants_1.LocalCacheEnabled);
+            if (localCache) {
+                core.info(`Namespace local cache is automatically committed. Skipping save step.`);
                 return;
             }
             // If restore has stored a primary key in state, reuse that
@@ -10085,10 +10095,22 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.envNumber = exports.isCacheFeatureAvailable = exports.getInputAsBool = exports.getInputAsInt = exports.getInputAsArray = exports.isValidEvent = exports.logWarning = exports.isExactKeyMatch = exports.isGhes = void 0;
+exports.restoreLocalCache = exports.nscCachePath = exports.envNumber = exports.isCacheFeatureAvailable = exports.getInputAsBool = exports.getInputAsInt = exports.getInputAsArray = exports.isValidEvent = exports.logWarning = exports.isExactKeyMatch = exports.isGhes = void 0;
 const cache = __importStar(__nccwpck_require__(3264));
 const core = __importStar(__nccwpck_require__(2186));
+const exec = __importStar(__nccwpck_require__(1514));
+const fs = __importStar(__nccwpck_require__(7147));
+const path = __importStar(__nccwpck_require__(1017));
 const constants_1 = __nccwpck_require__(9042);
 function isGhes() {
     const ghUrl = new URL(process.env["GITHUB_SERVER_URL"] || "https://github.com");
@@ -10154,6 +10176,26 @@ function envNumber(key) {
     }
 }
 exports.envNumber = envNumber;
+function nscCachePath() {
+    return process.env[constants_1.LocalCachePathKey] || "";
+}
+exports.nscCachePath = nscCachePath;
+function restoreLocalCache(localCachePath, cachePath, primaryKey) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Check if localCachePath/primaryKey directory exists
+        const localCachePathKey = path.join(localCachePath, primaryKey);
+        const cacheHit = fs.existsSync(localCachePathKey);
+        for (const p of cachePath) {
+            const fileCachedPath = path.join(localCachePathKey, p);
+            yield exec.exec(`mkdir -p ${fileCachedPath} ${p}`);
+            yield exec.exec(`sudo mount --bind ${fileCachedPath} ${p}`);
+        }
+        if (cacheHit) {
+            return primaryKey;
+        }
+    });
+}
+exports.restoreLocalCache = restoreLocalCache;
 
 
 /***/ }),

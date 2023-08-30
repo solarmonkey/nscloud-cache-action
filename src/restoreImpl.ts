@@ -43,9 +43,10 @@ async function restoreImpl(
         let cacheKey: string | undefined;
 
         if (localCache) {
+            core.warning(`Use Namespace local cache.`);
             const localCachePath = utils.nscCachePath();
             if (localCachePath === "") {
-                core.info(
+                core.warning(
                     `GitHub runner does not have Namespace cross-invocation cache.`
                 );
                 throw new Error(
