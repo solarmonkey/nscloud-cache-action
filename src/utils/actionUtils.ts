@@ -95,25 +95,23 @@ export function nscCachePath(): string {
 
 export async function restoreLocalCache(
     localCachePath: string,
-    cachePath: string[],
-    primaryKey: string
-): Promise<string | undefined> {
-    // Check if localCachePath/primaryKey directory exists
-    const localCachePathKey = path.join(localCachePath, primaryKey);
-    const cacheHit = fs.existsSync(localCachePathKey);
+    cachePath: string[]
+): Promise<string[]> {
+    const cacheMisses: string[] = [];
 
     for (const p of cachePath) {
         const expandedFilePath = resolveHome(p);
-        const fileCachedPath = path.join(localCachePathKey, expandedFilePath);
+        const fileCachedPath = path.join(localCachePath, expandedFilePath);
+        if (!fs.existsSync(fileCachedPath)) {
+            cacheMisses.push(p);
+        }
         await exec.exec(`mkdir -p ${fileCachedPath} ${expandedFilePath}`);
         await exec.exec(
             `sudo mount --bind ${fileCachedPath} ${expandedFilePath}`
         );
     }
 
-    if (cacheHit) {
-        return primaryKey;
-    }
+    return cacheMisses;
 }
 
 function resolveHome(filepath: string): string {

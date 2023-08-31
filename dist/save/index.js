@@ -9837,7 +9837,7 @@ var Inputs;
     Inputs["EnableCrossOsArchive"] = "enableCrossOsArchive";
     Inputs["FailOnCacheMiss"] = "fail-on-cache-miss";
     Inputs["LookupOnly"] = "lookup-only";
-    Inputs["LocalCache"] = "use-cache-volume"; // Input for cache, restore action
+    Inputs["UseCacheVolume"] = "use-cache-volume"; // Input for cache, restore action
 })(Inputs = exports.Inputs || (exports.Inputs = {}));
 var Outputs;
 (function (Outputs) {
@@ -10180,20 +10180,19 @@ function nscCachePath() {
     return process.env[constants_1.LocalCachePathKey] || "";
 }
 exports.nscCachePath = nscCachePath;
-function restoreLocalCache(localCachePath, cachePath, primaryKey) {
+function restoreLocalCache(localCachePath, cachePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        // Check if localCachePath/primaryKey directory exists
-        const localCachePathKey = path.join(localCachePath, primaryKey);
-        const cacheHit = fs.existsSync(localCachePathKey);
+        const cacheMisses = [];
         for (const p of cachePath) {
             const expandedFilePath = resolveHome(p);
-            const fileCachedPath = path.join(localCachePathKey, expandedFilePath);
+            const fileCachedPath = path.join(localCachePath, expandedFilePath);
+            if (!fs.existsSync(fileCachedPath)) {
+                cacheMisses.push(p);
+            }
             yield exec.exec(`mkdir -p ${fileCachedPath} ${expandedFilePath}`);
             yield exec.exec(`sudo mount --bind ${fileCachedPath} ${expandedFilePath}`);
         }
-        if (cacheHit) {
-            return primaryKey;
-        }
+        return cacheMisses;
     });
 }
 exports.restoreLocalCache = restoreLocalCache;

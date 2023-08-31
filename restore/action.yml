@@ -7,7 +7,7 @@ inputs:
     required: true
   key:
     description: 'An explicit key for restoring the cache'
-    required: true
+    required: false
   restore-keys:
     description: 'An ordered list of keys to use for restoring stale cache if no cache hit occurred for key. Note `cache-hit` returns false in this case.'
     required: false

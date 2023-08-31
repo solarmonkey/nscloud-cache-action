@@ -9837,7 +9837,7 @@ var Inputs;
     Inputs["EnableCrossOsArchive"] = "enableCrossOsArchive";
     Inputs["FailOnCacheMiss"] = "fail-on-cache-miss";
     Inputs["LookupOnly"] = "lookup-only";
-    Inputs["LocalCache"] = "use-cache-volume"; // Input for cache, restore action
+    Inputs["UseCacheVolume"] = "use-cache-volume"; // Input for cache, restore action
 })(Inputs = exports.Inputs || (exports.Inputs = {}));
 var Outputs;
 (function (Outputs) {
@@ -9948,59 +9948,82 @@ function restoreImpl(stateProvider) {
                 utils.logWarning(`Event Validation Error: The event type ${process.env[constants_1.Events.Key]} is not supported because it's not tied to a branch or tag ref.`);
                 return;
             }
-            const primaryKey = core.getInput(constants_1.Inputs.Key, { required: true });
-            stateProvider.setState(constants_1.State.CachePrimaryKey, primaryKey);
-            const restoreKeys = utils.getInputAsArray(constants_1.Inputs.RestoreKeys);
-            const cachePaths = utils.getInputAsArray(constants_1.Inputs.Path, {
-                required: true
-            });
-            const enableCrossOsArchive = utils.getInputAsBool(constants_1.Inputs.EnableCrossOsArchive);
-            const failOnCacheMiss = utils.getInputAsBool(constants_1.Inputs.FailOnCacheMiss);
-            const lookupOnly = utils.getInputAsBool(constants_1.Inputs.LookupOnly);
-            const localCache = utils.getInputAsBool(constants_1.Inputs.LocalCache);
-            let cacheKey;
-            if (localCache) {
-                core.info(`Use Namespace local cache.`);
-                const localCachePath = utils.nscCachePath();
-                if (localCachePath === "") {
-                    core.warning(`GitHub runner does not have Namespace cross-invocation cache.`);
-                    throw new Error(`Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?`);
-                }
-                core.info(`Found Namespace cross-invocation cache at ${localCachePath}.`);
-                cacheKey = yield utils.restoreLocalCache(localCachePath, cachePaths, primaryKey);
-                stateProvider.setState(constants_1.LocalCacheEnabled, localCachePath);
+            const useCacheVolume = utils.getInputAsBool(constants_1.Inputs.UseCacheVolume);
+            if (useCacheVolume) {
+                return yield restoreCacheVolumeImpl(stateProvider);
             }
             else {
-                cacheKey = yield cache.restoreCache(cachePaths, primaryKey, restoreKeys, {
-                    lookupOnly: lookupOnly,
-                    downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
-                }, enableCrossOsArchive);
+                return yield restoreRemoteImpl(stateProvider);
             }
-            if (!cacheKey) {
-                if (failOnCacheMiss) {
-                    throw new Error(`Failed to restore cache entry. Exiting as fail-on-cache-miss is set. Input key: ${primaryKey}`);
-                }
-                core.info(`Cache not found for input keys: ${[
-                    primaryKey,
-                    ...restoreKeys
-                ].join(", ")}`);
-                return;
-            }
-            // Store the matched cache key in states
-            stateProvider.setState(constants_1.State.CacheMatchedKey, cacheKey);
-            const isExactKeyMatch = utils.isExactKeyMatch(core.getInput(constants_1.Inputs.Key, { required: true }), cacheKey);
-            core.setOutput(constants_1.Outputs.CacheHit, isExactKeyMatch.toString());
-            if (lookupOnly) {
-                core.info(`Cache found and can be restored from key: ${cacheKey}`);
-            }
-            else {
-                core.info(`Cache restored from key: ${cacheKey}`);
-            }
-            return cacheKey;
         }
         catch (error) {
             core.setFailed(error.message);
         }
+    });
+}
+function restoreCacheVolumeImpl(stateProvider) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const cachePaths = utils.getInputAsArray(constants_1.Inputs.Path, {
+            required: true
+        });
+        core.info(`Use Namespace local cache.`);
+        const localCachePath = utils.nscCachePath();
+        if (localCachePath === "") {
+            core.warning(`GitHub runner does not have Namespace cross-invocation cache.`);
+            throw new Error(`Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?`);
+        }
+        core.info(`Found Namespace cross-invocation cache at ${localCachePath}.`);
+        const cacheMisses = yield utils.restoreLocalCache(localCachePath, cachePaths);
+        stateProvider.setState(constants_1.LocalCacheEnabled, localCachePath);
+        if (cacheMisses.length === 0) {
+            core.info(`All cache paths found and restored`);
+            const hit = true;
+            core.setOutput(constants_1.Outputs.CacheHit, hit.toString());
+        }
+        else {
+            core.info(`Some cache paths missing: ${cacheMisses}`);
+            const miss = false;
+            core.setOutput(constants_1.Outputs.CacheHit, miss.toString());
+        }
+        return "cachevolume";
+    });
+}
+function restoreRemoteImpl(stateProvider) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const restoreKeys = utils.getInputAsArray(constants_1.Inputs.RestoreKeys);
+        const cachePaths = utils.getInputAsArray(constants_1.Inputs.Path, {
+            required: true
+        });
+        const enableCrossOsArchive = utils.getInputAsBool(constants_1.Inputs.EnableCrossOsArchive);
+        const failOnCacheMiss = utils.getInputAsBool(constants_1.Inputs.FailOnCacheMiss);
+        const lookupOnly = utils.getInputAsBool(constants_1.Inputs.LookupOnly);
+        const primaryKey = core.getInput(constants_1.Inputs.Key, { required: true });
+        stateProvider.setState(constants_1.State.CachePrimaryKey, primaryKey);
+        const cacheKey = yield cache.restoreCache(cachePaths, primaryKey, restoreKeys, {
+            lookupOnly: lookupOnly,
+            downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
+        }, enableCrossOsArchive);
+        if (!cacheKey) {
+            if (failOnCacheMiss) {
+                throw new Error(`Failed to restore cache entry. Exiting as fail-on-cache-miss is set. Input key: ${primaryKey}`);
+            }
+            core.info(`Cache not found for input keys: ${[
+                primaryKey,
+                ...restoreKeys
+            ].join(", ")}`);
+            return;
+        }
+        // Store the matched cache key in states
+        stateProvider.setState(constants_1.State.CacheMatchedKey, cacheKey);
+        const isExactKeyMatch = utils.isExactKeyMatch(core.getInput(constants_1.Inputs.Key, { required: true }), cacheKey);
+        core.setOutput(constants_1.Outputs.CacheHit, isExactKeyMatch.toString());
+        if (lookupOnly) {
+            core.info(`Cache found and can be restored from key: ${cacheKey}`);
+        }
+        else {
+            core.info(`Cache restored from key: ${cacheKey}`);
+        }
+        return cacheKey;
     });
 }
 exports["default"] = restoreImpl;
@@ -10196,20 +10219,19 @@ function nscCachePath() {
     return process.env[constants_1.LocalCachePathKey] || "";
 }
 exports.nscCachePath = nscCachePath;
-function restoreLocalCache(localCachePath, cachePath, primaryKey) {
+function restoreLocalCache(localCachePath, cachePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        // Check if localCachePath/primaryKey directory exists
-        const localCachePathKey = path.join(localCachePath, primaryKey);
-        const cacheHit = fs.existsSync(localCachePathKey);
+        const cacheMisses = [];
         for (const p of cachePath) {
             const expandedFilePath = resolveHome(p);
-            const fileCachedPath = path.join(localCachePathKey, expandedFilePath);
+            const fileCachedPath = path.join(localCachePath, expandedFilePath);
+            if (!fs.existsSync(fileCachedPath)) {
+                cacheMisses.push(p);
+            }
             yield exec.exec(`mkdir -p ${fileCachedPath} ${expandedFilePath}`);
             yield exec.exec(`sudo mount --bind ${fileCachedPath} ${expandedFilePath}`);
         }
-        if (cacheHit) {
-            return primaryKey;
-        }
+        return cacheMisses;
     });
 }
 exports.restoreLocalCache = restoreLocalCache;

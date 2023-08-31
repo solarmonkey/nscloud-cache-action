@@ -7,7 +7,7 @@ inputs:
     required: true
   key:
     description: 'An explicit key for saving the cache'
-    required: true
+    required: false
   upload-chunk-size:
     description: 'The chunk size used to split up large files during upload, in bytes'
     required: false
