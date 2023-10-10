@@ -6,7 +6,6 @@ import { IStateProvider } from "./stateProvider";
 import * as utils from "./utils/actionUtils";
 import { constants } from "buffer";
 
-
 async function restoreImpl(
     stateProvider: IStateProvider
 ): Promise<string | undefined> {
@@ -30,6 +29,20 @@ async function restoreImpl(
         if (useCacheVolume) {
             return await restoreCacheVolumeImpl(stateProvider);
         } else {
+            utils.logWarning(`
+nscloud-cache-action is used in GitHub-compatibility mode. The compatibility mode is DEPRECATED.
+
+To proceed there are two options:
+
+  * Use cache-volume based caching (set use-cache-volume=true).
+    It is faster and more reliable, but does not support all of the original action options.
+
+  * Migrate back to the original actions/cache@v3 action.
+    It may still suffer from occasional unreliability, but supports all the action semantics.
+
+
+See https://cloud.namespace.so/docs/actions/nscloud-cache-action for updated documentation.
+`);
             return await restoreRemoteImpl(stateProvider);
         }
     } catch (error: unknown) {
@@ -97,7 +110,7 @@ async function restoreRemoteImpl(
         restoreKeys,
         {
             lookupOnly: lookupOnly,
-            downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
+            downloadConcurrency: utils.envNumber("CACHE_DOWNLOAD_CONCURRENCY")
         },
         enableCrossOsArchive
     );

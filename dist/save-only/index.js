@@ -7493,7 +7493,7 @@ class HttpClient {
             req.write(data, 'utf8');
         }
         if (data && typeof data !== 'string') {
-            data.on('close', function () {
+            data.on('end', function () {
                 req.end();
             });
             data.pipe(req);

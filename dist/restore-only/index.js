@@ -7493,7 +7493,7 @@ class HttpClient {
             req.write(data, 'utf8');
         }
         if (data && typeof data !== 'string') {
-            data.on('close', function () {
+            data.on('end', function () {
                 req.end();
             });
             data.pipe(req);
@@ -9922,6 +9922,20 @@ function restoreImpl(stateProvider) {
                 return yield restoreCacheVolumeImpl(stateProvider);
             }
             else {
+                utils.logWarning(`
+nscloud-cache-action is used in GitHub-compatibility mode. The compatibility mode is DEPRECATED.
+
+To proceed there are two options:
+
+  * Use cache-volume based caching (set use-cache-volume=true).
+    It is faster and more reliable, but does not support all of the original action options.
+
+  * Migrate back to the original actions/cache@v3 action.
+    It may still suffer from occasional unreliability, but supports all the action semantics.
+
+
+See https://cloud.namespace.so/docs/actions/nscloud-cache-action for updated documentation.
+`);
                 return yield restoreRemoteImpl(stateProvider);
             }
         }
@@ -9970,7 +9984,7 @@ function restoreRemoteImpl(stateProvider) {
         stateProvider.setState(constants_1.State.CachePrimaryKey, primaryKey);
         const cacheKey = yield cache.restoreCache(cachePaths, primaryKey, restoreKeys, {
             lookupOnly: lookupOnly,
-            downloadConcurrency: utils.envNumber('CACHE_DOWNLOAD_CONCURRENCY'),
+            downloadConcurrency: utils.envNumber("CACHE_DOWNLOAD_CONCURRENCY")
         }, enableCrossOsArchive);
         if (!cacheKey) {
             if (failOnCacheMiss) {
