@@ -1,0 +1,23 @@
+name: "Cache"
+description: "Cache artifacts like dependencies and build outputs to a Namespace Cloud cache volume to improve workflow execution time."
+author: "Namespace Labs"
+inputs:
+  path:
+    description: "A list of files, directories, and wildcard patterns to cache and restore"
+    required: true
+  # key:
+  #   description: "An explicit key for restoring and saving the cache"
+  #   required: false
+  fail-on-cache-miss:
+    description: "Fail the workflow if cache entry is not found"
+    default: "false"
+    required: false
+outputs:
+  cache-hit:
+    description: "A boolean value to indicate an exact match was found for the primary key"
+runs:
+  using: "node20"
+  main: "dist/index.js"
+branding:
+  icon: "archive"
+  color: "gray-dark"
