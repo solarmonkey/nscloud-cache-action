@@ -27033,15 +27033,21 @@ async function main() {
     const fullHit = cacheMisses.length === 0;
     core.setOutput(Output_CacheHit, fullHit.toString());
     if (!fullHit) {
-        core.warning(`Some cache paths missing: ${cacheMisses}`);
+        core.warning(`Some cache paths missing: ${cacheMisses}.`);
         const failOnCacheMiss = core.getBooleanInput(Input_FailOnCacheMiss);
         if (failOnCacheMiss) {
-            throw new Error(`Some cache paths missing: ${cacheMisses}`);
+            throw new Error(`Some cache paths missing: ${cacheMisses}.`);
         }
     }
     else {
-        core.info(`All cache paths found and restored`);
+        core.info(`All cache paths found and restored.`);
     }
+    const { stdout } = await exec.getExecOutput(`/bin/sh -c "df -h ${localCachePath} | awk 'FNR == 2 {print $2,$3}'"`, [], {
+        silent: true,
+        ignoreReturnCode: true
+    });
+    const cacheUtilData = stdout.trim().split(' ');
+    core.info(`Total available cache space is ${cacheUtilData[0]}, and ${cacheUtilData[1]} have been used.`);
 }
 async function restoreLocalCache(localCachePath, cachePath) {
     const cacheMisses = [];
