@@ -13,7 +13,7 @@ inputs:
     default: "false"
     required: false
   cache:
-    description: "A list of native cache modes. Supported options are 'go,yarn,pnpm'"
+    description: "A list of native cache modes. Supported options are 'go,yarn,pnpm,rust'"
     required: false
 outputs:
   cache-hit:

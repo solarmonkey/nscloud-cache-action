@@ -124,6 +124,10 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
       }
 
       return paths;
+    
+    case "rust":
+      // Do not cache the whole ~/.cargo dir as it contains ~/.cargo/bin, where the cargo binary lives
+      return [{ path: "~/.cargo/registry" }, { path: "~/.cargo/git" }, { path: "./target" }];
 
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);
