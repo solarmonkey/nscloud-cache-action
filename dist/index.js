@@ -27053,10 +27053,13 @@ async function main() {
 async function restoreLocalCache(localCachePath, cachePath) {
     const cacheMisses = [];
     for (const p of cachePath) {
-        const expandedFilePath = resolveHome(p);
+        const expandedFilePath = resolveHome(p.path);
         const fileCachedPath = external_path_.join(localCachePath, expandedFilePath);
         if (!external_fs_.existsSync(fileCachedPath)) {
-            cacheMisses.push(p);
+            cacheMisses.push(p.path);
+        }
+        if (p.wipe) {
+            await io.rmRF(fileCachedPath);
         }
         await io.mkdirP(fileCachedPath);
         await io.mkdirP(expandedFilePath);
@@ -27065,7 +27068,11 @@ async function restoreLocalCache(localCachePath, cachePath) {
     return cacheMisses;
 }
 async function resolveCachePaths() {
-    const paths = core.getMultilineInput(Input_Path);
+    const paths = [];
+    const manual = core.getMultilineInput(Input_Path);
+    for (const p of manual) {
+        paths.push({ path: p });
+    }
     const cacheModes = core.getMultilineInput(Input_Cache);
     for (const mode of cacheModes) {
         paths.push(...(await resolveCacheMode(mode)));
@@ -27077,10 +27084,18 @@ async function resolveCacheMode(cacheMode) {
         case "go":
             const goCache = await getExecStdout(`go env GOCACHE`);
             const goModCache = await getExecStdout(`go env GOMODCACHE`);
-            return [goCache, goModCache];
+            return [{ path: goCache }, { path: goModCache }];
         case "yarn":
             const yarnCache = await getExecStdout(`yarn cache dir`);
-            return [yarnCache];
+            return [{ path: yarnCache }];
+        case "pnpm":
+            const pnpmCache = await getExecStdout(`pnpm store path`);
+            const paths = [{ path: pnpmCache }];
+            const pnpmModules = await getExecStdout(`pnpm m ls --depth -1 --json | jq -r 'map(.path).[]'`);
+            for (const mod of pnpmModules) {
+                paths.push({ path: mod + "/node_modules", wipe: true });
+            }
+            return paths;
         default:
             core.warning(`Unknown cache option: ${cacheMode}.`);
             return [];
