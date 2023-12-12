@@ -25,6 +25,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
+          cache: false
       - name: Setup Go cache
         uses: ./ # Uses an action in the root directory
         with:
