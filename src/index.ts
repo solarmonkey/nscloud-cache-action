@@ -116,7 +116,7 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
       const paths: Path[] = [{ path: pnpmCache }];
 
       const pnpmModules = await getExecStdout(
-        `pnpm m ls --depth -1 --json | jq -r 'map(.path).[]'`
+        `pnpm m ls --depth -1 --json | jq 'map(.path)' | jq -r '.[]'`
       );
 
       for (const mod of pnpmModules) {

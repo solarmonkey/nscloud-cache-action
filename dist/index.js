@@ -27091,7 +27091,7 @@ async function resolveCacheMode(cacheMode) {
         case "pnpm":
             const pnpmCache = await getExecStdout(`pnpm store path`);
             const paths = [{ path: pnpmCache }];
-            const pnpmModules = await getExecStdout(`pnpm m ls --depth -1 --json | jq -r 'map(.path).[]'`);
+            const pnpmModules = await getExecStdout(`pnpm m ls --depth -1 --json | jq 'map(.path)' | jq -r '.[]'`);
             for (const mod of pnpmModules) {
                 paths.push({ path: mod + "/node_modules", wipe: true });
             }
