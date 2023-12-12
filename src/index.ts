@@ -14,6 +14,11 @@ const Output_CacheHit = "cache-hit";
 
 void main();
 
+type Path = {
+  path: string;
+  wipe?: boolean;
+};
+
 async function main() {
   const cachePaths = await resolveCachePaths();
   const localCachePath = process.env[Env_CacheRoot];
@@ -56,16 +61,21 @@ async function main() {
 
 export async function restoreLocalCache(
   localCachePath: string,
-  cachePath: string[]
+  cachePath: Path[]
 ): Promise<string[]> {
   const cacheMisses: string[] = [];
 
   for (const p of cachePath) {
-    const expandedFilePath = utils.resolveHome(p);
+    const expandedFilePath = utils.resolveHome(p.path);
     const fileCachedPath = path.join(localCachePath, expandedFilePath);
     if (!fs.existsSync(fileCachedPath)) {
-      cacheMisses.push(p);
+      cacheMisses.push(p.path);
     }
+
+    if (p.wipe) {
+      await io.rmRF(fileCachedPath);
+    }
+
     await io.mkdirP(fileCachedPath);
     await io.mkdirP(expandedFilePath);
     await exec.exec(`sudo mount --bind ${fileCachedPath} ${expandedFilePath}`);
@@ -74,8 +84,13 @@ export async function restoreLocalCache(
   return cacheMisses;
 }
 
-async function resolveCachePaths(): Promise<string[]> {
-  const paths: string[] = core.getMultilineInput(Input_Path);
+async function resolveCachePaths(): Promise<Path[]> {
+  const paths: Path[] = [];
+
+  const manual: string[] = core.getMultilineInput(Input_Path);
+  for (const p of manual) {
+    paths.push({ path: p });
+  }
 
   const cacheModes: string[] = core.getMultilineInput(Input_Cache);
   for (const mode of cacheModes) {
@@ -85,16 +100,30 @@ async function resolveCachePaths(): Promise<string[]> {
   return paths;
 }
 
-async function resolveCacheMode(cacheMode: string): Promise<string[]> {
+async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
   switch (cacheMode) {
     case "go":
       const goCache = await getExecStdout(`go env GOCACHE`);
       const goModCache = await getExecStdout(`go env GOMODCACHE`);
-      return [goCache, goModCache];
+      return [{ path: goCache }, { path: goModCache }];
 
     case "yarn":
       const yarnCache = await getExecStdout(`yarn cache dir`);
-      return [yarnCache];
+      return [{ path: yarnCache }];
+
+    case "pnpm":
+      const pnpmCache = await getExecStdout(`pnpm store path`);
+      const paths: Path[] = [{ path: pnpmCache }];
+
+      const pnpmModules = await getExecStdout(
+        `pnpm m ls --depth -1 --json | jq -r 'map(.path).[]'`
+      );
+
+      for (const mod of pnpmModules) {
+        paths.push({ path: mod + "/node_modules", wipe: true });
+      }
+
+      return paths;
 
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);
