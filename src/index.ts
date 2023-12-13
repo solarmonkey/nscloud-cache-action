@@ -115,19 +115,27 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
       const pnpmCache = await getExecStdout(`pnpm store path`);
       const paths: Path[] = [{ path: pnpmCache }];
 
-      const pnpmModules = await getExecStdout(
-        `pnpm m ls --depth -1 --json | jq 'map(.path)' | jq -r '.[]'`
-      );
+      const json = await getExecStdout(`pnpm m ls --depth -1 --json`);
+      const jsonMultiParse = require("json-multi-parse");
+      const parsed = jsonMultiParse(json);
 
-      for (const mod of pnpmModules) {
-        paths.push({ path: mod + "/node_modules", wipe: true });
+      for (const list of parsed) {
+        for (const entry of list) {
+          if (entry.path) {
+            paths.push({ path: entry.path + "/node_modules", wipe: true });
+          }
+        }
       }
 
       return paths;
-    
+
     case "rust":
       // Do not cache the whole ~/.cargo dir as it contains ~/.cargo/bin, where the cargo binary lives
-      return [{ path: "~/.cargo/registry" }, { path: "~/.cargo/git" }, { path: "./target" }];
+      return [
+        { path: "~/.cargo/registry" },
+        { path: "~/.cargo/git" },
+        { path: "./target" },
+      ];
 
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);

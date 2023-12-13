@@ -1,0 +1,40 @@
+name: Test PNPM caching
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pnpm:
+    runs-on:
+      - namespace-profile-e2e-small
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: PostHog/posthog
+      - uses: actions/checkout@v3
+        with:
+          path: cache-action
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8.x.x
+
+      - name: Setup PNPM cache
+        uses: ./cache-action
+        with:
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # - name: Breakpoint
+      #   if: always()
+      #   uses: namespacelabs/breakpoint-action@v0
+      #   with:
+      #     duration: 15m
+      #     authorized-users: edganiukov,hugosantos,n-g,htr,nichtverstehen,gmichelo
