@@ -135,6 +135,8 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
         { path: "~/.cargo/registry" },
         { path: "~/.cargo/git" },
         { path: "./target" },
+        // Cache cleaning feature uses SQLite file https://blog.rust-lang.org/2023/12/11/cargo-cache-cleaning.html
+        { path: "~/.cargo/.global-cache" },
       ];
 
     default:
