@@ -27096,6 +27096,9 @@ async function resolveCacheMode(cacheMode) {
         case "yarn":
             const yarnCache = await getExecStdout(`yarn cache dir`);
             return [{ path: yarnCache }];
+        case "python":
+            const pipCache = await getExecStdout(`pip cache dir`);
+            return [{ path: pipCache }];
         case "pnpm":
             const pnpmCache = await getExecStdout(`pnpm store path`);
             const paths = [{ path: pnpmCache }];
