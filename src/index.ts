@@ -143,6 +143,9 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
         { path: "~/.cargo/.global-cache" },
       ];
 
+    case "gradle":
+      return [{ path: "~/.gradle/caches" }, { path: "~/.gradle/wrapper" }];
+
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);
       return [];
