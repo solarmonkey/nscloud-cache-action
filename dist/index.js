@@ -27219,7 +27219,10 @@ async function resolveCacheMode(cacheMode) {
             const goModCache = await getExecStdout(`go env GOMODCACHE`);
             return [{ path: goCache }, { path: goModCache }];
         case "yarn":
-            const yarnCache = await getExecStdout(`yarn cache dir`);
+            const yarnVersion = await getExecStdout(`yarn --version`);
+            const yarnCache = yarnVersion.startsWith("1.")
+                ? await getExecStdout(`yarn cache dir`)
+                : await getExecStdout(`yarn config get cacheFolder`);
             return [{ path: yarnCache }];
         case "python":
             const pipCache = await getExecStdout(`pip cache dir`);
