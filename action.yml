@@ -21,7 +21,7 @@ outputs:
 runs:
   using: "node20"
   main: "dist/index/index.js"
-  post: "dist/post/post.js"
+  post: "dist/post/index.js"
 branding:
   icon: "archive"
   color: "gray-dark"
