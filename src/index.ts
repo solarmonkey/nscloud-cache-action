@@ -5,23 +5,24 @@ import * as exec from "@actions/exec";
 import * as io from "@actions/io";
 import * as utils from "./utils.js";
 
-const Env_CacheRoot = "NSC_CACHE_PATH";
 const Input_Key = "key"; // unused
 const Input_Path = "path";
 const Input_Cache = "cache";
 const Input_FailOnCacheMiss = "fail-on-cache-miss";
 const Output_CacheHit = "cache-hit";
+const ActionVersion = "nscloud-action-cache@v4";
 
 void main();
 
-type Path = {
-  path: string;
+type CachePath = {
+  pathInCache?: string;
   wipe?: boolean;
+  framework: string;
+  mountTarget: string; 
 };
 
 async function main() {
-  const cachePaths = await resolveCachePaths();
-  const localCachePath = process.env[Env_CacheRoot];
+  const localCachePath = process.env[utils.Env_CacheRoot];
   if (localCachePath == null) {
     throw new Error(
       `Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?`
@@ -29,7 +30,8 @@ async function main() {
   }
   core.info(`Found Namespace cross-invocation cache at ${localCachePath}.`);
 
-  const cacheMisses = await restoreLocalCache(localCachePath, cachePaths);
+  const cachePaths = await resolveCachePaths(localCachePath);
+  const cacheMisses = await restoreLocalCache(cachePaths);
 
   const fullHit = cacheMisses.length === 0;
   core.setOutput(Output_CacheHit, fullHit.toString());
@@ -45,51 +47,51 @@ async function main() {
     core.info(`All cache paths found and restored.`);
   }
 
-  const { stdout } = await exec.getExecOutput(
-    `/bin/sh -c "df -h ${localCachePath} | awk 'FNR == 2 {print $2,$3}'"`,
-    [],
-    {
-      silent: true,
-      ignoreReturnCode: true,
-    }
-  );
-  const cacheUtilData = stdout.trim().split(" ");
+  let metadata = await utils.ensureCacheMetadata(localCachePath);
+  metadata.updatedAt = new Date().toISOString();
+  metadata.version = 1;
+  if (!metadata.userRequest) {
+    metadata.userRequest = new Map<string, utils.CacheMount>();
+  }
+  
+  for (const p of cachePaths) {
+    metadata.userRequest.set(p.pathInCache, {cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion});
+  }
+  utils.writeCacheMetadata(localCachePath, metadata);
+
+  const cacheUtilInfo = await getCacheSummaryUtil(localCachePath)
   core.info(
-    `Total available cache space is ${cacheUtilData[0]}, and ${cacheUtilData[1]} have been used.`
+    `Total available cache space is ${cacheUtilInfo.size}, and ${cacheUtilInfo.used} have been used.`
   );
 }
 
-export async function restoreLocalCache(
-  localCachePath: string,
-  cachePath: Path[]
-): Promise<string[]> {
+export async function restoreLocalCache(cachePaths: CachePath[]): Promise<string[]> {
   const cacheMisses: string[] = [];
 
-  for (const p of cachePath) {
-    const expandedFilePath = utils.resolveHome(p.path);
-    const fileCachedPath = path.join(localCachePath, expandedFilePath);
-    if (!fs.existsSync(fileCachedPath)) {
-      cacheMisses.push(p.path);
+  for (const p of cachePaths) {
+    if (!fs.existsSync(p.pathInCache)) {
+      cacheMisses.push(p.mountTarget);
     }
 
     if (p.wipe) {
-      await io.rmRF(fileCachedPath);
+      await io.rmRF(p.pathInCache);
     }
 
-    await io.mkdirP(fileCachedPath);
+    const expandedFilePath = utils.resolveHome(p.mountTarget);
     await io.mkdirP(expandedFilePath);
-    await exec.exec(`sudo mount --bind ${fileCachedPath} ${expandedFilePath}`);
+    await io.mkdirP(p.pathInCache);
+    await exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
   }
 
   return cacheMisses;
 }
 
-async function resolveCachePaths(): Promise<Path[]> {
-  const paths: Path[] = [];
+async function resolveCachePaths(localCachePath: string): Promise<CachePath[]> {
+  const paths: CachePath[] = [];
 
   const manual: string[] = core.getMultilineInput(Input_Path);
   for (const p of manual) {
-    paths.push({ path: p });
+    paths.push({ mountTarget: p, framework: "custom" });
   }
 
   const cacheModes: string[] = core.getMultilineInput(Input_Cache);
@@ -97,30 +99,36 @@ async function resolveCachePaths(): Promise<Path[]> {
     paths.push(...(await resolveCacheMode(mode)));
   }
 
+  for (let p of paths) {
+    const expandedFilePath = utils.resolveHome(p.mountTarget);
+    const fileCachedPath = path.join(localCachePath, expandedFilePath);
+    p.pathInCache = fileCachedPath;
+  }
+
   return paths;
 }
 
-async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
+async function resolveCacheMode(cacheMode: string): Promise<CachePath[]> {
   switch (cacheMode) {
     case "go":
       const goCache = await getExecStdout(`go env GOCACHE`);
       const goModCache = await getExecStdout(`go env GOMODCACHE`);
-      return [{ path: goCache }, { path: goModCache }];
+      return [{ mountTarget: goCache, framework: cacheMode }, { mountTarget: goModCache, framework: cacheMode }];
 
     case "yarn":
       const yarnVersion = await getExecStdout(`yarn --version`);
       const yarnCache = yarnVersion.startsWith("1.")
         ? await getExecStdout(`yarn cache dir`)
         : await getExecStdout(`yarn config get cacheFolder`);
-      return [{ path: yarnCache }];
+      return [{ mountTarget: yarnCache, framework: cacheMode }];
 
     case "python":
       const pipCache = await getExecStdout(`pip cache dir`);
-      return [{ path: pipCache }];
+      return [{ mountTarget: pipCache, framework: cacheMode }];
 
     case "pnpm":
       const pnpmCache = await getExecStdout(`pnpm store path`);
-      const paths: Path[] = [{ path: pnpmCache }];
+      const paths: CachePath[] = [{ mountTarget: pnpmCache, framework: cacheMode }];
 
       const json = await getExecStdout(`pnpm m ls --depth -1 --json`);
       const jsonMultiParse = require("json-multi-parse");
@@ -129,7 +137,7 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
       for (const list of parsed) {
         for (const entry of list) {
           if (entry.path) {
-            paths.push({ path: entry.path + "/node_modules", wipe: true });
+            paths.push({ mountTarget: entry.path + "/node_modules", wipe: true, framework: cacheMode });
           }
         }
       }
@@ -139,15 +147,15 @@ async function resolveCacheMode(cacheMode: string): Promise<Path[]> {
     case "rust":
       // Do not cache the whole ~/.cargo dir as it contains ~/.cargo/bin, where the cargo binary lives
       return [
-        { path: "~/.cargo/registry" },
-        { path: "~/.cargo/git" },
-        { path: "./target" },
+        { mountTarget: "~/.cargo/registry", framework: cacheMode },
+        { mountTarget: "~/.cargo/git", framework: cacheMode },
+        { mountTarget: "./target", framework: cacheMode },
         // Cache cleaning feature uses SQLite file https://blog.rust-lang.org/2023/12/11/cargo-cache-cleaning.html
-        { path: "~/.cargo/.global-cache" },
+        { mountTarget: "~/.cargo/.global-cache", framework: cacheMode },
       ];
 
     case "gradle":
-      return [{ path: "~/.gradle/caches" }, { path: "~/.gradle/wrapper" }];
+      return [{ mountTarget: "~/.gradle/caches",framework: cacheMode  }, { mountTarget: "~/.gradle/wrapper", framework: cacheMode  }];
 
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);
@@ -161,4 +169,27 @@ async function getExecStdout(cmd: string): Promise<string> {
   });
 
   return stdout.trim();
+}
+
+type CacheSummaryUtil = {
+  size: string;
+  used: string;
+};
+
+
+async function getCacheSummaryUtil(cachePath: string): Promise<CacheSummaryUtil> {
+  const { stdout } = await exec.getExecOutput(
+    `/bin/sh -c "df -h ${cachePath} | awk 'FNR == 2 {print $2,$3}'"`,
+    [],
+    {
+      silent: true,
+      ignoreReturnCode: true,
+    }
+  );
+  const cacheUtilData = stdout.trim().split(" ");
+
+  return {
+    size: cacheUtilData[0],
+    used: cacheUtilData[1],
+  };
 }

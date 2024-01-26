@@ -4461,139 +4461,6 @@ module.exports = parseParams
 
 /***/ }),
 
-/***/ 3715:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const {splitByIndex, splitByLineAndChar} = __nccwpck_require__(8250);
-
-/**
- * List of regexes matching errors for unexpected characters after JSON data
- *
- * First placeholder: line number, 1-indexed
- * Second placeholder: character number, 1-indexed
- * Third placeholder: overall character index, 0-indexed
- */
-const ERROR_REGEXES = [
-	/^()()Unexpected .* in JSON at position (\d+)$/, // Node 8..18, Chrome 69
-	/^()()Unexpected non-whitespace character after JSON at position (\d+)$/, // Chromium 113
-	/^JSON.parse: unexpected non-whitespace character after JSON data at line (\d+) column (\d+) of the JSON data()$/, // Firefox 62
-];
-
-/**
- * Parse a string of multiple JSON objects/values
- *
- * @param {string} input String with zero or more JSON objects/values in series,
- *                       possibly separated by whitespace
- * @param {Object} [options] Options:
- * @param {boolean} [options.partial] Don't throw an error if the input ends
- *                                    partway through an object/value. Instead
- *                                    add a property `remainder` to the returned
- *                                    array with the remaining partial JSON
- *                                    string. Default: false
- * @param {string[]} [acc] Accumulator for internal use
- * @returns {(Object|Array|string|number|boolean|null)[]} Array of results
- */
-function jsonMultiParse(input, options = {}, acc = []) {
-	if (options.partial) {
-		acc.remainder = '';
-	}
-
-	if (input.trim().length === 0) {
-		return acc;
-	}
-
-	try {
-		acc.push(JSON.parse(input));
-		return acc;
-	} catch (error) {
-		let match = null;
-		for (const regex of ERROR_REGEXES) {
-			if (match = error.message.match(regex)) {
-				break;
-			}
-		}
-		if (!match) {
-			if (options.partial) {
-				acc.remainder = input;
-				return acc;
-			}
-			throw error;
-		}
-
-		const chunks = match[3]
-			? splitByIndex(input, parseInt(match[3], 10))
-			: splitByLineAndChar(input, parseInt(match[1], 10) - 1, parseInt(match[2], 10) - 1);
-
-		acc.push(JSON.parse(chunks[0]));
-		return jsonMultiParse(chunks[1], options, acc);
-	}
-}
-
-module.exports = jsonMultiParse;
-
-
-/***/ }),
-
-/***/ 8250:
-/***/ ((module) => {
-
-/**
- * Split a string by character index
- *
- * @param {string} input
- * @param {number} index Character index, 0-indexed
- * @returns {string[]} The two output chunks
- */
-function splitByIndex(input, index) {
-	if (index < 0 || index >= input.length) {
-		throw new Error(`Character index ${index} out of range`);
-	}
-	return [input.substr(0, index), input.substr(index)];
-}
-
-/**
- * Split a string by line index and character index
- *
- * @param {string} input
- * @param {number} lineIndex Line index, 0-indexed
- * @param {number} charIndex Character index, 0-indexed
- * @returns {string[]} The two output chunks
- */
-function splitByLineAndChar(input, lineIndex, charIndex) {
-	if (lineIndex < 0) {
-		throw new Error(`Line index ${lineIndex} out of range`);
-	}
-	if (charIndex < 0) {
-		throw new Error(`Character index ${charIndex} out of range`);
-	}
-
-	// Find the start of the line we are interested in
-	let lineStartIndex = 0;
-	for (let l = lineIndex; l > 0; l--) {
-		lineStartIndex = input.indexOf('\n', lineStartIndex);
-		if (lineStartIndex === -1) {
-			throw new Error(`Line index ${lineIndex} out of range`);
-		}
-		lineStartIndex++;
-	}
-
-	// Check the character number we want is within this line
-	const nextNl = input.indexOf('\n', lineStartIndex);
-	if (lineStartIndex + charIndex >= input.length || nextNl !== -1 && nextNl <= lineStartIndex + charIndex) {
-		throw new Error(`Character index ${charIndex} out of range for line ${lineIndex}`);
-	}
-
-	return splitByIndex(input, lineStartIndex + charIndex);
-}
-
-module.exports = {
-	splitByIndex,
-	splitByLineAndChar,
-};
-
-
-/***/ }),
-
 /***/ 4294:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -26846,6 +26713,14 @@ exports["default"] = _default;
 
 /***/ }),
 
+/***/ 5865:
+/***/ ((module) => {
+
+module.exports = eval("require")("json-multi-parse");
+
+
+/***/ }),
+
 /***/ 9491:
 /***/ ((module) => {
 
@@ -27127,11 +27002,14 @@ var external_path_ = __nccwpck_require__(1017);
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
 var core = __nccwpck_require__(2186);
 // EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
-var exec = __nccwpck_require__(1514);
+var lib_exec = __nccwpck_require__(1514);
 // EXTERNAL MODULE: ./node_modules/@actions/io/lib/io.js
 var io = __nccwpck_require__(7436);
 ;// CONCATENATED MODULE: ./src/utils.ts
 
+
+
+const Env_CacheRoot = "NSC_CACHE_PATH";
 function resolveHome(filepath) {
     // Ugly, but should work
     const home = process.env["HOME"] || "~";
@@ -27141,6 +27019,31 @@ function resolveHome(filepath) {
     }
     return filepath;
 }
+async function getCacheUtil(cachePath) {
+    const { stdout } = await exec.getExecOutput(`/bin/sh -c "du -sb ${cachePath} | cut -f1"`, [], {
+        silent: true,
+        ignoreReturnCode: true,
+    });
+    const cacheUtil = parseInt(stdout.trim());
+    return cacheUtil;
+}
+async function ensureCacheMetadata(cachePath) {
+    const namespaceFolderPath = external_path_.join(cachePath, "namespace");
+    const metadataFilePath = external_path_.join(namespaceFolderPath, "metadata.json");
+    external_fs_.mkdirSync(namespaceFolderPath, { recursive: true });
+    if (!external_fs_.existsSync(metadataFilePath)) {
+        return {};
+    }
+    const rawData = external_fs_.readFileSync(metadataFilePath, "utf8");
+    const metadata = JSON.parse(rawData);
+    return metadata;
+}
+async function writeCacheMetadata(cachePath, metadata) {
+    const namespaceFolderPath = external_path_.join(cachePath, "namespace");
+    const metadataFilePath = external_path_.join(namespaceFolderPath, "metadata.json");
+    const rawData = JSON.stringify(metadata);
+    external_fs_.writeFileSync(metadataFilePath, rawData, {});
+}
 
 ;// CONCATENATED MODULE: ./src/index.ts
 
@@ -27149,21 +27052,21 @@ function resolveHome(filepath) {
 
 
 
-const Env_CacheRoot = "NSC_CACHE_PATH";
 const Input_Key = "key"; // unused
 const Input_Path = "path";
 const Input_Cache = "cache";
 const Input_FailOnCacheMiss = "fail-on-cache-miss";
 const Output_CacheHit = "cache-hit";
+const ActionVersion = "nscloud-action-cache@v4";
 void main();
 async function main() {
-    const cachePaths = await resolveCachePaths();
     const localCachePath = process.env[Env_CacheRoot];
     if (localCachePath == null) {
         throw new Error(`Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?`);
     }
     core.info(`Found Namespace cross-invocation cache at ${localCachePath}.`);
-    const cacheMisses = await restoreLocalCache(localCachePath, cachePaths);
+    const cachePaths = await resolveCachePaths(localCachePath);
+    const cacheMisses = await restoreLocalCache(cachePaths);
     const fullHit = cacheMisses.length === 0;
     core.setOutput(Output_CacheHit, fullHit.toString());
     if (!fullHit) {
@@ -27176,39 +27079,49 @@ async function main() {
     else {
         core.info(`All cache paths found and restored.`);
     }
-    const { stdout } = await exec.getExecOutput(`/bin/sh -c "df -h ${localCachePath} | awk 'FNR == 2 {print $2,$3}'"`, [], {
-        silent: true,
-        ignoreReturnCode: true,
-    });
-    const cacheUtilData = stdout.trim().split(" ");
-    core.info(`Total available cache space is ${cacheUtilData[0]}, and ${cacheUtilData[1]} have been used.`);
+    let metadata = await ensureCacheMetadata(localCachePath);
+    metadata.updatedAt = new Date().toISOString();
+    metadata.version = 1;
+    if (!metadata.userRequest) {
+        metadata.userRequest = new Map();
+    }
+    for (const p of cachePaths) {
+        metadata.userRequest.set(p.pathInCache, { cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion });
+    }
+    writeCacheMetadata(localCachePath, metadata);
+    const cacheUtilInfo = await getCacheSummaryUtil(localCachePath);
+    core.info(`Total available cache space is ${cacheUtilInfo.size}, and ${cacheUtilInfo.used} have been used.`);
 }
-async function restoreLocalCache(localCachePath, cachePath) {
+async function restoreLocalCache(cachePaths) {
     const cacheMisses = [];
-    for (const p of cachePath) {
-        const expandedFilePath = resolveHome(p.path);
-        const fileCachedPath = external_path_.join(localCachePath, expandedFilePath);
-        if (!external_fs_.existsSync(fileCachedPath)) {
-            cacheMisses.push(p.path);
+    for (const p of cachePaths) {
+        if (!external_fs_.existsSync(p.pathInCache)) {
+            cacheMisses.push(p.mountTarget);
         }
         if (p.wipe) {
-            await io.rmRF(fileCachedPath);
+            await io.rmRF(p.pathInCache);
         }
-        await io.mkdirP(fileCachedPath);
+        const expandedFilePath = resolveHome(p.mountTarget);
         await io.mkdirP(expandedFilePath);
-        await exec.exec(`sudo mount --bind ${fileCachedPath} ${expandedFilePath}`);
+        await io.mkdirP(p.pathInCache);
+        await lib_exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
     }
     return cacheMisses;
 }
-async function resolveCachePaths() {
+async function resolveCachePaths(localCachePath) {
     const paths = [];
     const manual = core.getMultilineInput(Input_Path);
     for (const p of manual) {
-        paths.push({ path: p });
+        paths.push({ mountTarget: p, framework: "custom" });
     }
     const cacheModes = core.getMultilineInput(Input_Cache);
     for (const mode of cacheModes) {
         paths.push(...(await resolveCacheMode(mode)));
+    }
+    for (let p of paths) {
+        const expandedFilePath = resolveHome(p.mountTarget);
+        const fileCachedPath = external_path_.join(localCachePath, expandedFilePath);
+        p.pathInCache = fileCachedPath;
     }
     return paths;
 }
@@ -27217,26 +27130,26 @@ async function resolveCacheMode(cacheMode) {
         case "go":
             const goCache = await getExecStdout(`go env GOCACHE`);
             const goModCache = await getExecStdout(`go env GOMODCACHE`);
-            return [{ path: goCache }, { path: goModCache }];
+            return [{ mountTarget: goCache, framework: cacheMode }, { mountTarget: goModCache, framework: cacheMode }];
         case "yarn":
             const yarnVersion = await getExecStdout(`yarn --version`);
             const yarnCache = yarnVersion.startsWith("1.")
                 ? await getExecStdout(`yarn cache dir`)
                 : await getExecStdout(`yarn config get cacheFolder`);
-            return [{ path: yarnCache }];
+            return [{ mountTarget: yarnCache, framework: cacheMode }];
         case "python":
             const pipCache = await getExecStdout(`pip cache dir`);
-            return [{ path: pipCache }];
+            return [{ mountTarget: pipCache, framework: cacheMode }];
         case "pnpm":
             const pnpmCache = await getExecStdout(`pnpm store path`);
-            const paths = [{ path: pnpmCache }];
+            const paths = [{ mountTarget: pnpmCache, framework: cacheMode }];
             const json = await getExecStdout(`pnpm m ls --depth -1 --json`);
-            const jsonMultiParse = __nccwpck_require__(3715);
+            const jsonMultiParse = __nccwpck_require__(5865);
             const parsed = jsonMultiParse(json);
             for (const list of parsed) {
                 for (const entry of list) {
                     if (entry.path) {
-                        paths.push({ path: entry.path + "/node_modules", wipe: true });
+                        paths.push({ mountTarget: entry.path + "/node_modules", wipe: true, framework: cacheMode });
                     }
                 }
             }
@@ -27244,24 +27157,35 @@ async function resolveCacheMode(cacheMode) {
         case "rust":
             // Do not cache the whole ~/.cargo dir as it contains ~/.cargo/bin, where the cargo binary lives
             return [
-                { path: "~/.cargo/registry" },
-                { path: "~/.cargo/git" },
-                { path: "./target" },
+                { mountTarget: "~/.cargo/registry", framework: cacheMode },
+                { mountTarget: "~/.cargo/git", framework: cacheMode },
+                { mountTarget: "./target", framework: cacheMode },
                 // Cache cleaning feature uses SQLite file https://blog.rust-lang.org/2023/12/11/cargo-cache-cleaning.html
-                { path: "~/.cargo/.global-cache" },
+                { mountTarget: "~/.cargo/.global-cache", framework: cacheMode },
             ];
         case "gradle":
-            return [{ path: "~/.gradle/caches" }, { path: "~/.gradle/wrapper" }];
+            return [{ mountTarget: "~/.gradle/caches", framework: cacheMode }, { mountTarget: "~/.gradle/wrapper", framework: cacheMode }];
         default:
             core.warning(`Unknown cache option: ${cacheMode}.`);
             return [];
     }
 }
 async function getExecStdout(cmd) {
-    const { stdout } = await exec.getExecOutput(cmd, [], {
+    const { stdout } = await lib_exec.getExecOutput(cmd, [], {
         silent: true,
     });
     return stdout.trim();
+}
+async function getCacheSummaryUtil(cachePath) {
+    const { stdout } = await lib_exec.getExecOutput(`/bin/sh -c "df -h ${cachePath} | awk 'FNR == 2 {print $2,$3}'"`, [], {
+        silent: true,
+        ignoreReturnCode: true,
+    });
+    const cacheUtilData = stdout.trim().split(" ");
+    return {
+        size: cacheUtilData[0],
+        used: cacheUtilData[1],
+    };
 }
 
 })();
