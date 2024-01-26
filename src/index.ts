@@ -10,7 +10,7 @@ const Input_Path = "path";
 const Input_Cache = "cache";
 const Input_FailOnCacheMiss = "fail-on-cache-miss";
 const Output_CacheHit = "cache-hit";
-const ActionVersion = "nscloud-action-cache@v4";
+const ActionVersion = "nscloud-action-cache@v1";
 
 void main();
 
@@ -47,15 +47,20 @@ async function main() {
     core.info(`All cache paths found and restored.`);
   }
 
+  // Write/update cache volume metadata file
   let metadata = await utils.ensureCacheMetadata(localCachePath);
   metadata.updatedAt = new Date().toISOString();
   metadata.version = 1;
   if (!metadata.userRequest) {
     metadata.userRequest = {};
   }
+  if (!metadata.preExecution) {
+    metadata.preExecution = {usage: {}};
+  }
   
   for (const p of cachePaths) {
     metadata.userRequest[p.pathInCache] = {cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion};
+    metadata.preExecution.usage[p.pathInCache] = await utils.getCacheUtil(p.pathInCache);
   }
   utils.writeCacheMetadata(localCachePath, metadata);
 
