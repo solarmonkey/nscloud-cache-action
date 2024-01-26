@@ -27042,7 +27042,7 @@ async function writeCacheMetadata(cachePath, metadata) {
     const namespaceFolderPath = external_path_.join(cachePath, "namespace");
     const metadataFilePath = external_path_.join(namespaceFolderPath, "metadata.json");
     const rawData = JSON.stringify(metadata);
-    external_fs_.writeFileSync(metadataFilePath, rawData, {});
+    external_fs_.writeFileSync(metadataFilePath, rawData);
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
@@ -27083,10 +27083,10 @@ async function main() {
     metadata.updatedAt = new Date().toISOString();
     metadata.version = 1;
     if (!metadata.userRequest) {
-        metadata.userRequest = new Map();
+        metadata.userRequest = {};
     }
     for (const p of cachePaths) {
-        metadata.userRequest.set(p.pathInCache, { cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion });
+        metadata.userRequest[p.pathInCache] = { cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion };
     }
     writeCacheMetadata(localCachePath, metadata);
     const cacheUtilInfo = await getCacheSummaryUtil(localCachePath);

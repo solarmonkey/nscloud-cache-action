@@ -51,11 +51,11 @@ async function main() {
   metadata.updatedAt = new Date().toISOString();
   metadata.version = 1;
   if (!metadata.userRequest) {
-    metadata.userRequest = new Map<string, utils.CacheMount>();
+    metadata.userRequest = {};
   }
   
   for (const p of cachePaths) {
-    metadata.userRequest.set(p.pathInCache, {cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion});
+    metadata.userRequest[p.pathInCache] = {cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion};
   }
   utils.writeCacheMetadata(localCachePath, metadata);
 

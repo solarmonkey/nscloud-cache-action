@@ -30,7 +30,7 @@ export async function getCacheUtil(cachePath: string): Promise<number> {
 export interface CacheMetadata {
   version?: number
   updatedAt?: string
-  userRequest?: Map<string, CacheMount>
+  userRequest?: {[key: string]: CacheMount}
   preExecution?: ExecutionInfo
   postExecution?: ExecutionInfo
 }
@@ -41,7 +41,7 @@ export interface CacheMount {
 }
 
 export interface ExecutionInfo {
-  usage: Map<string, number>
+  usage: {[key: string]: number}
 }
 
 export async function ensureCacheMetadata(cachePath: string): Promise<CacheMetadata> {
@@ -61,5 +61,5 @@ export async function writeCacheMetadata(cachePath: string, metadata: CacheMetad
   const namespaceFolderPath = path.join(cachePath, "namespace");
   const metadataFilePath = path.join(namespaceFolderPath, "metadata.json");
   const rawData = JSON.stringify(metadata);
-  fs.writeFileSync(metadataFilePath, rawData, {})
+  fs.writeFileSync(metadataFilePath, rawData)
 }
