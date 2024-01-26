@@ -33,6 +33,9 @@ jobs:
       - name: Run a Go build
         run: |
           go install namespacelabs.dev/foundation/cmd/ns@latest
+      - name: Print cache metadata file
+        run :
+          cat /cache/namespace/metadata.json
       - name: Breakpoint on failure
         if: failure() && github.ref_name == 'main'
         uses: namespacelabs/breakpoint-action@v0

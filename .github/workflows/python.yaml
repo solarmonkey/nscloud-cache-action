@@ -27,3 +27,6 @@ jobs:
           path: demo
       - run: pip install -r ./requirements.txt
         working-directory: ./demo
+      - name: Print cache metadata file
+        run :
+          cat /cache/namespace/metadata.json

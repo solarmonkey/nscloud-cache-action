@@ -29,3 +29,6 @@ jobs:
         working-directory: ./demo
       - run: cargo test --locked --release --all
         working-directory: ./demo
+      - name: Print cache metadata file
+        run :
+          cat /cache/namespace/metadata.json

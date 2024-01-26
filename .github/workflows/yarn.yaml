@@ -29,3 +29,6 @@ jobs:
         working-directory: ./demo
       - run: yarn workspace @project/web-app build
         working-directory: ./demo
+      - name: Print cache metadata file
+        run :
+          cat /cache/namespace/metadata.json
