@@ -3,7 +3,7 @@ import * as path from "path";
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as io from "@actions/io";
-import * as utils from "./utils.js";
+import * as utils from "./utils";
 
 const Input_Key = "key"; // unused
 const Input_Path = "path";
@@ -13,13 +13,6 @@ const Output_CacheHit = "cache-hit";
 const ActionVersion = "nscloud-action-cache@v1";
 
 void main();
-
-type CachePath = {
-  pathInCache?: string;
-  wipe?: boolean;
-  framework: string;
-  mountTarget: string; 
-};
 
 async function main() {
   const localCachePath = process.env[utils.Env_CacheRoot];
@@ -63,6 +56,8 @@ async function main() {
     metadata.preExecution.usage[p.pathInCache] = await utils.getCacheUtil(p.pathInCache);
   }
   utils.writeCacheMetadata(localCachePath, metadata);
+  // Save the list of cache paths to actions state for the post-cache action
+  core.saveState(utils.StatePathsKey, cachePaths);
 
   const cacheUtilInfo = await getCacheSummaryUtil(localCachePath)
   core.info(
@@ -70,7 +65,7 @@ async function main() {
   );
 }
 
-export async function restoreLocalCache(cachePaths: CachePath[]): Promise<string[]> {
+export async function restoreLocalCache(cachePaths: utils.CachePath[]): Promise<string[]> {
   const cacheMisses: string[] = [];
 
   for (const p of cachePaths) {
@@ -91,8 +86,8 @@ export async function restoreLocalCache(cachePaths: CachePath[]): Promise<string
   return cacheMisses;
 }
 
-async function resolveCachePaths(localCachePath: string): Promise<CachePath[]> {
-  const paths: CachePath[] = [];
+async function resolveCachePaths(localCachePath: string): Promise<utils.CachePath[]> {
+  const paths: utils.CachePath[] = [];
 
   const manual: string[] = core.getMultilineInput(Input_Path);
   for (const p of manual) {
@@ -113,7 +108,7 @@ async function resolveCachePaths(localCachePath: string): Promise<CachePath[]> {
   return paths;
 }
 
-async function resolveCacheMode(cacheMode: string): Promise<CachePath[]> {
+async function resolveCacheMode(cacheMode: string): Promise<utils.CachePath[]> {
   switch (cacheMode) {
     case "go":
       const goCache = await getExecStdout(`go env GOCACHE`);
@@ -133,7 +128,7 @@ async function resolveCacheMode(cacheMode: string): Promise<CachePath[]> {
 
     case "pnpm":
       const pnpmCache = await getExecStdout(`pnpm store path`);
-      const paths: CachePath[] = [{ mountTarget: pnpmCache, framework: cacheMode }];
+      const paths: utils.CachePath[] = [{ mountTarget: pnpmCache, framework: cacheMode }];
 
       const json = await getExecStdout(`pnpm m ls --depth -1 --json`);
       const jsonMultiParse = require("json-multi-parse");

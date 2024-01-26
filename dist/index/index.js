@@ -27010,6 +27010,7 @@ var io = __nccwpck_require__(7436);
 
 
 const Env_CacheRoot = "NSC_CACHE_PATH";
+const StatePathsKey = "paths";
 function resolveHome(filepath) {
     // Ugly, but should work
     const home = process.env["HOME"] || "~";
@@ -27094,6 +27095,8 @@ async function main() {
         metadata.preExecution.usage[p.pathInCache] = await getCacheUtil(p.pathInCache);
     }
     writeCacheMetadata(localCachePath, metadata);
+    // Save the list of cache paths to actions state for the post-cache action
+    core.saveState(StatePathsKey, cachePaths);
     const cacheUtilInfo = await getCacheSummaryUtil(localCachePath);
     core.info(`Total available cache space is ${cacheUtilInfo.size}, and ${cacheUtilInfo.used} have been used.`);
 }

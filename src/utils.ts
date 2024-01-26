@@ -3,6 +3,14 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 
 export const Env_CacheRoot = "NSC_CACHE_PATH";
+export const StatePathsKey = "paths";
+
+export interface CachePath {
+  pathInCache?: string;
+  wipe?: boolean;
+  framework: string;
+  mountTarget: string; 
+}
 
 export function resolveHome(filepath: string): string {
   // Ugly, but should work
