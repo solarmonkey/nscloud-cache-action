@@ -27002,7 +27002,7 @@ var external_path_ = __nccwpck_require__(1017);
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
 var core = __nccwpck_require__(2186);
 // EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
-var exec = __nccwpck_require__(1514);
+var lib_exec = __nccwpck_require__(1514);
 // EXTERNAL MODULE: ./node_modules/@actions/io/lib/io.js
 var io = __nccwpck_require__(7436);
 ;// CONCATENATED MODULE: ./src/utils.ts
@@ -27087,12 +27087,8 @@ async function main() {
     if (!metadata.userRequest) {
         metadata.userRequest = {};
     }
-    if (!metadata.preExecution) {
-        metadata.preExecution = { usage: {} };
-    }
     for (const p of cachePaths) {
         metadata.userRequest[p.pathInCache] = { cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion };
-        metadata.preExecution.usage[p.pathInCache] = await getCacheUtil(p.pathInCache);
     }
     writeCacheMetadata(localCachePath, metadata);
     // Save the list of cache paths to actions state for the post-cache action
@@ -27112,7 +27108,7 @@ async function restoreLocalCache(cachePaths) {
         const expandedFilePath = resolveHome(p.mountTarget);
         await io.mkdirP(expandedFilePath);
         await io.mkdirP(p.pathInCache);
-        await exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
+        await lib_exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
     }
     return cacheMisses;
 }
@@ -27179,13 +27175,13 @@ async function resolveCacheMode(cacheMode) {
     }
 }
 async function getExecStdout(cmd) {
-    const { stdout } = await exec.getExecOutput(cmd, [], {
+    const { stdout } = await lib_exec.getExecOutput(cmd, [], {
         silent: true,
     });
     return stdout.trim();
 }
 async function getCacheSummaryUtil(cachePath) {
-    const { stdout } = await exec.getExecOutput(`/bin/sh -c "df -h ${cachePath} | awk 'FNR == 2 {print $2,$3}'"`, [], {
+    const { stdout } = await lib_exec.getExecOutput(`/bin/sh -c "df -h ${cachePath} | awk 'FNR == 2 {print $2,$3}'"`, [], {
         silent: true,
         ignoreReturnCode: true,
     });

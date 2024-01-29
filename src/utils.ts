@@ -39,17 +39,11 @@ export interface CacheMetadata {
   version?: number
   updatedAt?: string
   userRequest?: {[key: string]: CacheMount}
-  preExecution?: ExecutionInfo
-  postExecution?: ExecutionInfo
 }
 export interface CacheMount {
   source: string
   cacheFramework: string
   mountTarget: string[]
-}
-
-export interface ExecutionInfo {
-  usage: {[key: string]: number}
 }
 
 export async function ensureCacheMetadata(cachePath: string): Promise<CacheMetadata> {

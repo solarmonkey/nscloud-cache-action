@@ -47,13 +47,9 @@ async function main() {
   if (!metadata.userRequest) {
     metadata.userRequest = {};
   }
-  if (!metadata.preExecution) {
-    metadata.preExecution = {usage: {}};
-  }
   
   for (const p of cachePaths) {
     metadata.userRequest[p.pathInCache] = {cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion};
-    metadata.preExecution.usage[p.pathInCache] = await utils.getCacheUtil(p.pathInCache);
   }
   utils.writeCacheMetadata(localCachePath, metadata);
   // Save the list of cache paths to actions state for the post-cache action
