@@ -41,4 +41,4 @@ jobs:
         working-directory: ./demo
 
       - name: Print cache metadata file
-        run: cat /cache/namespace/metadata.json
+        run: cat /cache/.ns/metadata.json

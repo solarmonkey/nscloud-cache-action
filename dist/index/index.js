@@ -4461,139 +4461,6 @@ module.exports = parseParams
 
 /***/ }),
 
-/***/ 3715:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const {splitByIndex, splitByLineAndChar} = __nccwpck_require__(8250);
-
-/**
- * List of regexes matching errors for unexpected characters after JSON data
- *
- * First placeholder: line number, 1-indexed
- * Second placeholder: character number, 1-indexed
- * Third placeholder: overall character index, 0-indexed
- */
-const ERROR_REGEXES = [
-	/^()()Unexpected .* in JSON at position (\d+)$/, // Node 8..18, Chrome 69
-	/^()()Unexpected non-whitespace character after JSON at position (\d+)$/, // Chromium 113
-	/^JSON.parse: unexpected non-whitespace character after JSON data at line (\d+) column (\d+) of the JSON data()$/, // Firefox 62
-];
-
-/**
- * Parse a string of multiple JSON objects/values
- *
- * @param {string} input String with zero or more JSON objects/values in series,
- *                       possibly separated by whitespace
- * @param {Object} [options] Options:
- * @param {boolean} [options.partial] Don't throw an error if the input ends
- *                                    partway through an object/value. Instead
- *                                    add a property `remainder` to the returned
- *                                    array with the remaining partial JSON
- *                                    string. Default: false
- * @param {string[]} [acc] Accumulator for internal use
- * @returns {(Object|Array|string|number|boolean|null)[]} Array of results
- */
-function jsonMultiParse(input, options = {}, acc = []) {
-	if (options.partial) {
-		acc.remainder = '';
-	}
-
-	if (input.trim().length === 0) {
-		return acc;
-	}
-
-	try {
-		acc.push(JSON.parse(input));
-		return acc;
-	} catch (error) {
-		let match = null;
-		for (const regex of ERROR_REGEXES) {
-			if (match = error.message.match(regex)) {
-				break;
-			}
-		}
-		if (!match) {
-			if (options.partial) {
-				acc.remainder = input;
-				return acc;
-			}
-			throw error;
-		}
-
-		const chunks = match[3]
-			? splitByIndex(input, parseInt(match[3], 10))
-			: splitByLineAndChar(input, parseInt(match[1], 10) - 1, parseInt(match[2], 10) - 1);
-
-		acc.push(JSON.parse(chunks[0]));
-		return jsonMultiParse(chunks[1], options, acc);
-	}
-}
-
-module.exports = jsonMultiParse;
-
-
-/***/ }),
-
-/***/ 8250:
-/***/ ((module) => {
-
-/**
- * Split a string by character index
- *
- * @param {string} input
- * @param {number} index Character index, 0-indexed
- * @returns {string[]} The two output chunks
- */
-function splitByIndex(input, index) {
-	if (index < 0 || index >= input.length) {
-		throw new Error(`Character index ${index} out of range`);
-	}
-	return [input.substr(0, index), input.substr(index)];
-}
-
-/**
- * Split a string by line index and character index
- *
- * @param {string} input
- * @param {number} lineIndex Line index, 0-indexed
- * @param {number} charIndex Character index, 0-indexed
- * @returns {string[]} The two output chunks
- */
-function splitByLineAndChar(input, lineIndex, charIndex) {
-	if (lineIndex < 0) {
-		throw new Error(`Line index ${lineIndex} out of range`);
-	}
-	if (charIndex < 0) {
-		throw new Error(`Character index ${charIndex} out of range`);
-	}
-
-	// Find the start of the line we are interested in
-	let lineStartIndex = 0;
-	for (let l = lineIndex; l > 0; l--) {
-		lineStartIndex = input.indexOf('\n', lineStartIndex);
-		if (lineStartIndex === -1) {
-			throw new Error(`Line index ${lineIndex} out of range`);
-		}
-		lineStartIndex++;
-	}
-
-	// Check the character number we want is within this line
-	const nextNl = input.indexOf('\n', lineStartIndex);
-	if (lineStartIndex + charIndex >= input.length || nextNl !== -1 && nextNl <= lineStartIndex + charIndex) {
-		throw new Error(`Character index ${charIndex} out of range for line ${lineIndex}`);
-	}
-
-	return splitByIndex(input, lineStartIndex + charIndex);
-}
-
-module.exports = {
-	splitByIndex,
-	splitByLineAndChar,
-};
-
-
-/***/ }),
-
 /***/ 4294:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -26846,6 +26713,14 @@ exports["default"] = _default;
 
 /***/ }),
 
+/***/ 5865:
+/***/ ((module) => {
+
+module.exports = eval("require")("json-multi-parse");
+
+
+/***/ }),
+
 /***/ 9491:
 /***/ ((module) => {
 
@@ -27136,6 +27011,8 @@ var io = __nccwpck_require__(7436);
 
 const Env_CacheRoot = "NSC_CACHE_PATH";
 const StatePathsKey = "paths";
+const privateNamespaceDir = ".ns";
+const metadataFileName = "metadata.json";
 function resolveHome(filepath) {
     // Ugly, but should work
     const home = process.env["HOME"] || "~";
@@ -27154,8 +27031,8 @@ async function getCacheUtil(cachePath) {
     return cacheUtil;
 }
 async function ensureCacheMetadata(cachePath) {
-    const namespaceFolderPath = external_path_.join(cachePath, "namespace");
-    const metadataFilePath = external_path_.join(namespaceFolderPath, "metadata.json");
+    const namespaceFolderPath = external_path_.join(cachePath, privateNamespaceDir);
+    const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
     external_fs_.mkdirSync(namespaceFolderPath, { recursive: true });
     if (!external_fs_.existsSync(metadataFilePath)) {
         return {};
@@ -27165,8 +27042,8 @@ async function ensureCacheMetadata(cachePath) {
     return metadata;
 }
 async function writeCacheMetadata(cachePath, metadata) {
-    const namespaceFolderPath = external_path_.join(cachePath, "namespace");
-    const metadataFilePath = external_path_.join(namespaceFolderPath, "metadata.json");
+    const namespaceFolderPath = external_path_.join(cachePath, privateNamespaceDir);
+    const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
     const rawData = JSON.stringify(metadata);
     external_fs_.writeFileSync(metadataFilePath, rawData);
 }
@@ -27285,7 +27162,7 @@ async function resolveCacheMode(cacheMode) {
                 { mountTarget: pnpmCache, framework: cacheMode },
             ];
             const json = await getExecStdout("pnpm m ls --depth -1 --json");
-            const jsonMultiParse = __nccwpck_require__(3715);
+            const jsonMultiParse = __nccwpck_require__(5865);
             const parsed = jsonMultiParse(json);
             for (const list of parsed) {
                 for (const entry of list) {

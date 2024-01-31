@@ -5,6 +5,9 @@ import * as fs from "fs";
 export const Env_CacheRoot = "NSC_CACHE_PATH";
 export const StatePathsKey = "paths";
 
+const privateNamespaceDir = ".ns"
+const metadataFileName = "metadata.json"
+
 export interface CachePath {
   pathInCache?: string;
   wipe?: boolean;
@@ -47,8 +50,8 @@ export interface CacheMount {
 }
 
 export async function ensureCacheMetadata(cachePath: string): Promise<CacheMetadata> {
-  const namespaceFolderPath = path.join(cachePath, "namespace");
-  const metadataFilePath = path.join(namespaceFolderPath, "metadata.json");
+  const namespaceFolderPath = path.join(cachePath, privateNamespaceDir);
+  const metadataFilePath = path.join(namespaceFolderPath, metadataFileName);
   fs.mkdirSync(namespaceFolderPath, { recursive: true });
 	if (!fs.existsSync(metadataFilePath)) {
     return {};
@@ -60,8 +63,8 @@ export async function ensureCacheMetadata(cachePath: string): Promise<CacheMetad
 }
 
 export async function writeCacheMetadata(cachePath: string, metadata: CacheMetadata) {
-  const namespaceFolderPath = path.join(cachePath, "namespace");
-  const metadataFilePath = path.join(namespaceFolderPath, "metadata.json");
+  const namespaceFolderPath = path.join(cachePath, privateNamespaceDir);
+  const metadataFilePath = path.join(namespaceFolderPath, metadataFileName);
   const rawData = JSON.stringify(metadata);
   fs.writeFileSync(metadataFilePath, rawData)
 }
