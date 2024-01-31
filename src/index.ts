@@ -30,7 +30,7 @@ async function main() {
   core.setOutput(Output_CacheHit, fullHit.toString());
 
   if (!fullHit) {
-    core.warning(`Some cache paths missing: ${cacheMisses}.`);
+    core.info(`Some cache paths missing: ${cacheMisses}.`);
 
     const failOnCacheMiss = core.getBooleanInput(Input_FailOnCacheMiss);
     if (failOnCacheMiss) {
