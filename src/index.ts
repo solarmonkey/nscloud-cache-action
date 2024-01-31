@@ -18,7 +18,7 @@ async function main() {
   const localCachePath = process.env[utils.Env_CacheRoot];
   if (localCachePath == null) {
     throw new Error(
-      `Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?`
+      "Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?"
     );
   }
   core.info(`Found Namespace cross-invocation cache at ${localCachePath}.`);
@@ -37,31 +37,37 @@ async function main() {
       throw new Error(`Some cache paths missing: ${cacheMisses}.`);
     }
   } else {
-    core.info(`All cache paths found and restored.`);
+    core.info("All cache paths found and restored.");
   }
 
   // Write/update cache volume metadata file
-  let metadata = await utils.ensureCacheMetadata(localCachePath);
+  const metadata = await utils.ensureCacheMetadata(localCachePath);
   metadata.updatedAt = new Date().toISOString();
   metadata.version = 1;
   if (!metadata.userRequest) {
     metadata.userRequest = {};
   }
-  
+
   for (const p of cachePaths) {
-    metadata.userRequest[p.pathInCache] = {cacheFramework: p.framework, mountTarget: [p.mountTarget], source: ActionVersion};
+    metadata.userRequest[p.pathInCache] = {
+      cacheFramework: p.framework,
+      mountTarget: [p.mountTarget],
+      source: ActionVersion,
+    };
   }
   utils.writeCacheMetadata(localCachePath, metadata);
   // Save the list of cache paths to actions state for the post-cache action
   core.saveState(utils.StatePathsKey, cachePaths);
 
-  const cacheUtilInfo = await getCacheSummaryUtil(localCachePath)
+  const cacheUtilInfo = await getCacheSummaryUtil(localCachePath);
   core.info(
     `Total available cache space is ${cacheUtilInfo.size}, and ${cacheUtilInfo.used} have been used.`
   );
 }
 
-export async function restoreLocalCache(cachePaths: utils.CachePath[]): Promise<string[]> {
+export async function restoreLocalCache(
+  cachePaths: utils.CachePath[]
+): Promise<string[]> {
   const cacheMisses: string[] = [];
 
   for (const p of cachePaths) {
@@ -82,7 +88,9 @@ export async function restoreLocalCache(cachePaths: utils.CachePath[]): Promise<
   return cacheMisses;
 }
 
-async function resolveCachePaths(localCachePath: string): Promise<utils.CachePath[]> {
+async function resolveCachePaths(
+  localCachePath: string
+): Promise<utils.CachePath[]> {
   const paths: utils.CachePath[] = [];
 
   const manual: string[] = core.getMultilineInput(Input_Path);
@@ -95,7 +103,7 @@ async function resolveCachePaths(localCachePath: string): Promise<utils.CachePat
     paths.push(...(await resolveCacheMode(mode)));
   }
 
-  for (let p of paths) {
+  for (const p of paths) {
     const expandedFilePath = utils.resolveHome(p.mountTarget);
     const fileCachedPath = path.join(localCachePath, expandedFilePath);
     p.pathInCache = fileCachedPath;
@@ -106,39 +114,52 @@ async function resolveCachePaths(localCachePath: string): Promise<utils.CachePat
 
 async function resolveCacheMode(cacheMode: string): Promise<utils.CachePath[]> {
   switch (cacheMode) {
-    case "go":
-      const goCache = await getExecStdout(`go env GOCACHE`);
-      const goModCache = await getExecStdout(`go env GOMODCACHE`);
-      return [{ mountTarget: goCache, framework: cacheMode }, { mountTarget: goModCache, framework: cacheMode }];
+    case "go": {
+      const goCache = await getExecStdout("go env GOCACHE");
+      const goModCache = await getExecStdout("go env GOMODCACHE");
+      return [
+        { mountTarget: goCache, framework: cacheMode },
+        { mountTarget: goModCache, framework: cacheMode },
+      ];
+    }
 
-    case "yarn":
-      const yarnVersion = await getExecStdout(`yarn --version`);
+    case "yarn": {
+      const yarnVersion = await getExecStdout("yarn --version");
       const yarnCache = yarnVersion.startsWith("1.")
-        ? await getExecStdout(`yarn cache dir`)
-        : await getExecStdout(`yarn config get cacheFolder`);
+        ? await getExecStdout("yarn cache dir")
+        : await getExecStdout("yarn config get cacheFolder");
       return [{ mountTarget: yarnCache, framework: cacheMode }];
+    }
 
-    case "python":
-      const pipCache = await getExecStdout(`pip cache dir`);
+    case "python": {
+      const pipCache = await getExecStdout("pip cache dir");
       return [{ mountTarget: pipCache, framework: cacheMode }];
+    }
 
-    case "pnpm":
-      const pnpmCache = await getExecStdout(`pnpm store path`);
-      const paths: utils.CachePath[] = [{ mountTarget: pnpmCache, framework: cacheMode }];
+    case "pnpm": {
+      const pnpmCache = await getExecStdout("pnpm store path");
+      const paths: utils.CachePath[] = [
+        { mountTarget: pnpmCache, framework: cacheMode },
+      ];
 
-      const json = await getExecStdout(`pnpm m ls --depth -1 --json`);
+      const json = await getExecStdout("pnpm m ls --depth -1 --json");
       const jsonMultiParse = require("json-multi-parse");
       const parsed = jsonMultiParse(json);
 
       for (const list of parsed) {
         for (const entry of list) {
           if (entry.path) {
-            paths.push({ mountTarget: entry.path + "/node_modules", wipe: true, framework: cacheMode });
+            paths.push({
+              mountTarget: `${entry.path}/node_modules`,
+              wipe: true,
+              framework: cacheMode,
+            });
           }
         }
       }
 
       return paths;
+    }
 
     case "rust":
       // Do not cache the whole ~/.cargo dir as it contains ~/.cargo/bin, where the cargo binary lives
@@ -151,7 +172,10 @@ async function resolveCacheMode(cacheMode: string): Promise<utils.CachePath[]> {
       ];
 
     case "gradle":
-      return [{ mountTarget: "~/.gradle/caches",framework: cacheMode  }, { mountTarget: "~/.gradle/wrapper", framework: cacheMode  }];
+      return [
+        { mountTarget: "~/.gradle/caches", framework: cacheMode },
+        { mountTarget: "~/.gradle/wrapper", framework: cacheMode },
+      ];
 
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);
@@ -172,8 +196,9 @@ type CacheSummaryUtil = {
   used: string;
 };
 
-
-async function getCacheSummaryUtil(cachePath: string): Promise<CacheSummaryUtil> {
+async function getCacheSummaryUtil(
+  cachePath: string
+): Promise<CacheSummaryUtil> {
   const { stdout } = await exec.getExecOutput(
     `/bin/sh -c "df -h ${cachePath} | awk 'FNR == 2 {print $2,$3}'"`,
     [],
