@@ -27012,7 +27012,7 @@ var io = __nccwpck_require__(7436);
 const Env_CacheRoot = "NSC_CACHE_PATH";
 const StatePathsKey = "paths";
 const privateNamespaceDir = ".ns";
-const metadataFileName = "metadata.json";
+const metadataFileName = "cache-metadata.json";
 function resolveHome(filepath) {
     // Ugly, but should work
     const home = process.env["HOME"] || "~";

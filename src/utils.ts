@@ -6,7 +6,7 @@ export const Env_CacheRoot = "NSC_CACHE_PATH";
 export const StatePathsKey = "paths";
 
 const privateNamespaceDir = ".ns"
-const metadataFileName = "metadata.json"
+const metadataFileName = "cache-metadata.json"
 
 export interface CachePath {
   pathInCache?: string;
