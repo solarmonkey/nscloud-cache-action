@@ -1,0 +1,38 @@
+name: Test pnpm caching
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  yarn:
+    runs-on:
+      - namespace-profile-e2e-small
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v3
+        with:
+          repository: namespace-integration-demos/cache-yarn-workspaces
+          path: demo
+      - name: Setup pnpm cache
+        uses: ./ # Uses an action in the root directory
+        with:
+          cache: pnpm
+          path: |
+            ./node_modules/.cache
+      - run: pnpm install
+        working-directory: ./demo/fullstack
+      - run: pnpm build
+        working-directory: ./demo/fullstack
+      - name: Print cache metadata file
+        run :
+          cat /cache/.ns/cache-metadata.json
