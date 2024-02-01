@@ -12,16 +12,18 @@ permissions:
   contents: read
 
 jobs:
-  yarn:
+  pnpm:
     runs-on:
       - namespace-profile-e2e-small
     steps:
       - uses: actions/checkout@v3
       - name: Install pnpm
         uses: pnpm/action-setup@v2
+        with: 
+            version: "8.6.2"
       - uses: actions/checkout@v3
         with:
-          repository: namespace-integration-demos/cache-yarn-workspaces
+          repository: namespace-integration-demos/cache-pnpm-workspace
           path: demo
       - name: Setup pnpm cache
         uses: ./ # Uses an action in the root directory
