@@ -27157,8 +27157,8 @@ async function getCacheUtil(cachePath) {
 }
 async function ensureCacheMetadata(cachePath) {
     const namespaceFolderPath = external_path_.join(cachePath, privateNamespaceDir);
-    const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
     external_fs_.mkdirSync(namespaceFolderPath, { recursive: true });
+    const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
     if (!external_fs_.existsSync(metadataFilePath)) {
         return {};
     }
@@ -27168,6 +27168,7 @@ async function ensureCacheMetadata(cachePath) {
 }
 async function writeCacheMetadata(cachePath, metadata) {
     const namespaceFolderPath = external_path_.join(cachePath, privateNamespaceDir);
+    external_fs_.mkdirSync(namespaceFolderPath, { recursive: true });
     const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
     const rawData = JSON.stringify(metadata);
     external_fs_.writeFileSync(metadataFilePath, rawData);
@@ -27207,21 +27208,27 @@ async function main() {
     else {
         core.info("All cache paths found and restored.");
     }
-    // Write/update cache volume metadata file
-    const metadata = await ensureCacheMetadata(localCachePath);
-    metadata.updatedAt = new Date().toISOString();
-    metadata.version = 1;
-    if (!metadata.userRequest) {
-        metadata.userRequest = {};
+    try {
+        // Write/update cache volume metadata file
+        const metadata = await ensureCacheMetadata(localCachePath);
+        metadata.updatedAt = new Date().toISOString();
+        metadata.version = 1;
+        if (!metadata.userRequest) {
+            metadata.userRequest = {};
+        }
+        for (const p of cachePaths) {
+            metadata.userRequest[p.pathInCache] = {
+                cacheFramework: p.framework,
+                mountTarget: [p.mountTarget],
+                source: ActionVersion,
+            };
+        }
+        writeCacheMetadata(localCachePath, metadata);
     }
-    for (const p of cachePaths) {
-        metadata.userRequest[p.pathInCache] = {
-            cacheFramework: p.framework,
-            mountTarget: [p.mountTarget],
-            source: ActionVersion,
-        };
+    catch (e) {
+        core.warning("Failed to record cache metadata.");
+        core.info(e.message);
     }
-    writeCacheMetadata(localCachePath, metadata);
     // Save the list of cache paths to actions state for the post-cache action
     core.saveState(StatePathsKey, cachePaths);
     const cacheUtilInfo = await getCacheSummaryUtil(localCachePath);

@@ -40,22 +40,28 @@ async function main() {
     core.info("All cache paths found and restored.");
   }
 
-  // Write/update cache volume metadata file
-  const metadata = await utils.ensureCacheMetadata(localCachePath);
-  metadata.updatedAt = new Date().toISOString();
-  metadata.version = 1;
-  if (!metadata.userRequest) {
-    metadata.userRequest = {};
+  try {
+    // Write/update cache volume metadata file
+    const metadata = await utils.ensureCacheMetadata(localCachePath);
+    metadata.updatedAt = new Date().toISOString();
+    metadata.version = 1;
+    if (!metadata.userRequest) {
+      metadata.userRequest = {};
+    }
+
+    for (const p of cachePaths) {
+      metadata.userRequest[p.pathInCache] = {
+        cacheFramework: p.framework,
+        mountTarget: [p.mountTarget],
+        source: ActionVersion,
+      };
+    }
+    utils.writeCacheMetadata(localCachePath, metadata);
+  } catch (e) {
+    core.warning("Failed to record cache metadata.");
+    core.info(e.message);
   }
 
-  for (const p of cachePaths) {
-    metadata.userRequest[p.pathInCache] = {
-      cacheFramework: p.framework,
-      mountTarget: [p.mountTarget],
-      source: ActionVersion,
-    };
-  }
-  utils.writeCacheMetadata(localCachePath, metadata);
   // Save the list of cache paths to actions state for the post-cache action
   core.saveState(utils.StatePathsKey, cachePaths);
 

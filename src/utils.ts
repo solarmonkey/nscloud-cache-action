@@ -53,8 +53,9 @@ export async function ensureCacheMetadata(
   cachePath: string
 ): Promise<CacheMetadata> {
   const namespaceFolderPath = path.join(cachePath, privateNamespaceDir);
-  const metadataFilePath = path.join(namespaceFolderPath, metadataFileName);
   fs.mkdirSync(namespaceFolderPath, { recursive: true });
+
+  const metadataFilePath = path.join(namespaceFolderPath, metadataFileName);
   if (!fs.existsSync(metadataFilePath)) {
     return {};
   }
@@ -69,6 +70,8 @@ export async function writeCacheMetadata(
   metadata: CacheMetadata
 ) {
   const namespaceFolderPath = path.join(cachePath, privateNamespaceDir);
+  fs.mkdirSync(namespaceFolderPath, { recursive: true });
+
   const metadataFilePath = path.join(namespaceFolderPath, metadataFileName);
   const rawData = JSON.stringify(metadata);
   fs.writeFileSync(metadataFilePath, rawData);
