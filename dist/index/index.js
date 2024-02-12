@@ -27147,6 +27147,27 @@ function resolveHome(filepath) {
     }
     return filepath;
 }
+async function sudoMkdirP(path, userColonGroup) {
+    const anc = ancestors(path);
+    for (const p of anc) {
+        if (external_fs_.existsSync(p))
+            continue;
+        await lib_exec.exec("sudo", ["mkdir", p]);
+        await lib_exec.exec("sudo", ["chown", userColonGroup, p]);
+    }
+}
+function ancestors(filepath) {
+    const res = [];
+    let norm = external_path_.normalize(filepath);
+    while (norm !== "." && norm !== "/") {
+        res.unshift(norm);
+        const next = external_path_.dirname(norm);
+        if (next === norm)
+            break;
+        norm = next;
+    }
+    return res;
+}
 async function getCacheUtil(cachePath) {
     const { stdout } = await exec.getExecOutput(`/bin/sh -c "du -sb ${cachePath} | cut -f1"`, [], {
         silent: true,
@@ -27245,9 +27266,8 @@ async function restoreLocalCache(cachePaths) {
         }
         const expandedFilePath = resolveHome(p.mountTarget);
         await io.mkdirP(p.pathInCache);
-        // Sudo to be able to create dirs in root (e.g. /nix).
-        // Use `install` instead of `mkdir -p` to easily set owners.
-        await lib_exec.exec(`sudo install -d -o runner -g docker ${expandedFilePath}`);
+        // Sudo to be able to create dirs in root (e.g. /nix), but set the runner as owner.
+        await sudoMkdirP(expandedFilePath, "runner:docker");
         await lib_exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
     }
     return cacheMisses;

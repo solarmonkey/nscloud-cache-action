@@ -25,6 +25,27 @@ export function resolveHome(filepath: string): string {
   return filepath;
 }
 
+export async function sudoMkdirP(path: string, userColonGroup: string) {
+  const anc = ancestors(path);
+  for (const p of anc) {
+    if (fs.existsSync(p)) continue;
+    await exec.exec("sudo", ["mkdir", p]);
+    await exec.exec("sudo", ["chown", userColonGroup, p]);
+  }
+}
+
+function ancestors(filepath: string) {
+  const res: string[] = [];
+  let norm = path.normalize(filepath);
+  while (norm !== "." && norm !== "/") {
+    res.unshift(norm);
+    const next = path.dirname(norm);
+    if (next === norm) break;
+    norm = next;
+  }
+  return res;
+}
+
 export async function getCacheUtil(cachePath: string): Promise<number> {
   const { stdout } = await exec.getExecOutput(
     `/bin/sh -c "du -sb ${cachePath} | cut -f1"`,
