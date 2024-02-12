@@ -27244,8 +27244,10 @@ async function restoreLocalCache(cachePaths) {
             await io.rmRF(p.pathInCache);
         }
         const expandedFilePath = resolveHome(p.mountTarget);
-        await io.mkdirP(expandedFilePath);
         await io.mkdirP(p.pathInCache);
+        // Sudo to be able to create dirs in root (e.g. /nix).
+        // Use `install` instead of `mkdir -p` to easily set owners.
+        await lib_exec.exec(`sudo install -d -o runner -g docker ${expandedFilePath}`);
         await lib_exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
     }
     return cacheMisses;
