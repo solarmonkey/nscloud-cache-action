@@ -36,7 +36,7 @@ export async function sudoMkdirP(path: string) {
   for (const p of anc) {
     if (fs.existsSync(p)) continue;
     await exec.exec("sudo", ["mkdir", p]);
-    await exec.exec("sudo", ["chown", "-n", userColonGroup, p]);
+    await exec.exec("sudo", ["chown", userColonGroup, p]);
   }
 }
 

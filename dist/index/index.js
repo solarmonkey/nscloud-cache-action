@@ -27158,7 +27158,7 @@ async function sudoMkdirP(path) {
         if (external_fs_.existsSync(p))
             continue;
         await lib_exec.exec("sudo", ["mkdir", p]);
-        await lib_exec.exec("sudo", ["chown", "-n", userColonGroup, p]);
+        await lib_exec.exec("sudo", ["chown", userColonGroup, p]);
     }
 }
 function ancestors(filepath) {
