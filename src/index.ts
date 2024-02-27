@@ -88,7 +88,7 @@ export async function restoreLocalCache(
     const expandedFilePath = utils.resolveHome(p.mountTarget);
     await io.mkdirP(p.pathInCache);
     // Sudo to be able to create dirs in root (e.g. /nix), but set the runner as owner.
-    await utils.sudoMkdirP(expandedFilePath, "runner:docker");
+    await utils.sudoMkdirP(expandedFilePath);
     await exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
   }
 

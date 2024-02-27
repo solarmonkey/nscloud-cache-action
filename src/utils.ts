@@ -25,12 +25,18 @@ export function resolveHome(filepath: string): string {
   return filepath;
 }
 
-export async function sudoMkdirP(path: string, userColonGroup: string) {
+// Creates directories in path. Exercises root permissions,
+// but sets owner for created dirs to the current user.
+export async function sudoMkdirP(path: string) {
+  const uid = process.getuid();
+  const gid = process.getgid();
+  const userColonGroup = `${uid}:${gid}`;
+
   const anc = ancestors(path);
   for (const p of anc) {
     if (fs.existsSync(p)) continue;
     await exec.exec("sudo", ["mkdir", p]);
-    await exec.exec("sudo", ["chown", userColonGroup, p]);
+    await exec.exec("sudo", ["chown", "-n", userColonGroup, p]);
   }
 }
 

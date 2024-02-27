@@ -27147,13 +27147,18 @@ function resolveHome(filepath) {
     }
     return filepath;
 }
-async function sudoMkdirP(path, userColonGroup) {
+// Creates directories in path. Exercises root permissions,
+// but sets owner for created dirs to the current user.
+async function sudoMkdirP(path) {
+    const uid = process.getuid();
+    const gid = process.getgid();
+    const userColonGroup = `${uid}:${gid}`;
     const anc = ancestors(path);
     for (const p of anc) {
         if (external_fs_.existsSync(p))
             continue;
         await lib_exec.exec("sudo", ["mkdir", p]);
-        await lib_exec.exec("sudo", ["chown", userColonGroup, p]);
+        await lib_exec.exec("sudo", ["chown", "-n", userColonGroup, p]);
     }
 }
 function ancestors(filepath) {
@@ -27267,7 +27272,7 @@ async function restoreLocalCache(cachePaths) {
         const expandedFilePath = resolveHome(p.mountTarget);
         await io.mkdirP(p.pathInCache);
         // Sudo to be able to create dirs in root (e.g. /nix), but set the runner as owner.
-        await sudoMkdirP(expandedFilePath, "runner:docker");
+        await sudoMkdirP(expandedFilePath);
         await lib_exec.exec(`sudo mount --bind ${p.pathInCache} ${expandedFilePath}`);
     }
     return cacheMisses;
