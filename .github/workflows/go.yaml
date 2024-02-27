@@ -6,6 +6,8 @@ on:
   pull_request:
     branches:
       - "*"
+  schedule:
+    - cron: "10 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -34,8 +36,7 @@ jobs:
         run: |
           go install namespacelabs.dev/foundation/cmd/ns@latest
       - name: Print cache metadata file
-        run :
-          cat /cache/.ns/cache-metadata.json
+        run: cat /cache/.ns/cache-metadata.json
       - name: Breakpoint on failure
         if: failure() && github.ref_name == 'main'
         uses: namespacelabs/breakpoint-action@v0

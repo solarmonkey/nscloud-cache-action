@@ -6,6 +6,8 @@ on:
   pull_request:
     branches:
       - "*"
+  schedule:
+    - cron: "25 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -28,5 +30,4 @@ jobs:
       - run: pip install -r ./requirements.txt
         working-directory: ./demo
       - name: Print cache metadata file
-        run :
-          cat /cache/.ns/cache-metadata.json
+        run: cat /cache/.ns/cache-metadata.json

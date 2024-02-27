@@ -6,6 +6,8 @@ on:
   pull_request:
     branches:
       - "*"
+  schedule:
+    - cron: "30 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -30,5 +32,4 @@ jobs:
       - run: cargo test --locked --release --all
         working-directory: ./demo
       - name: Print cache metadata file
-        run :
-          cat /cache/.ns/cache-metadata.json
+        run: cat /cache/.ns/cache-metadata.json
