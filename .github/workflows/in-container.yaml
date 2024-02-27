@@ -1,0 +1,43 @@
+name: Test in a container
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  in-container:
+    runs-on:
+      - namespace-profile-e2e-small
+
+    container:
+      image: node:21
+      env:
+        NSC_CACHE_PATH: ${{ env.NSC_CACHE_PATH }}
+      volumes:
+        - /cache:/cache
+      options: --cap-add=SYS_ADMIN
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sudo
+        run: |
+          apt-get update -y && apt-get install -y sudo
+
+      - name: Set up Nix cache
+        uses: namespacelabs/nscloud-cache-action@344aba36b864a47c4bae7ea0c0aff4cda7e6d50a
+        with:
+          path: .npm
+
+      - name: Run npm install
+        run: npm install
+
+      - name: Print cache metadata file
+        run: cat /cache/.ns/cache-metadata.json
