@@ -27352,6 +27352,10 @@ async function resolveCacheMode(cacheMode) {
             ];
         case "maven":
             return [{ mountTarget: "~/.m2/repository", framework: cacheMode }];
+        case "composer": {
+            const composerCache = await getExecStdout("composer config cache-files-dir");
+            return [{ mountTarget: composerCache, framework: cacheMode }];
+        }
         default:
             core.warning(`Unknown cache option: ${cacheMode}.`);
             return [];
