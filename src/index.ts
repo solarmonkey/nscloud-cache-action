@@ -189,7 +189,7 @@ async function resolveCacheMode(cacheMode: string): Promise<utils.CachePath[]> {
 
     case "composer": {
       const composerCache = await getExecStdout(
-        "composer config cache-files-dir"
+        "composer config --global cache-files-dir"
       );
       return [{ mountTarget: composerCache, framework: cacheMode }];
     }

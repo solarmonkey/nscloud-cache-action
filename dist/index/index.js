@@ -27353,7 +27353,7 @@ async function resolveCacheMode(cacheMode) {
         case "maven":
             return [{ mountTarget: "~/.m2/repository", framework: cacheMode }];
         case "composer": {
-            const composerCache = await getExecStdout("composer config cache-files-dir");
+            const composerCache = await getExecStdout("composer config --global cache-files-dir");
             return [{ mountTarget: composerCache, framework: cacheMode }];
         }
         default:
