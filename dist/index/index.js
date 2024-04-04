@@ -27120,10 +27120,10 @@ __nccwpck_require__.d(__webpack_exports__, {
   "A": () => (/* binding */ restoreLocalCache)
 });
 
-// EXTERNAL MODULE: external "fs"
-var external_fs_ = __nccwpck_require__(7147);
-// EXTERNAL MODULE: external "path"
-var external_path_ = __nccwpck_require__(1017);
+;// CONCATENATED MODULE: external "node:fs"
+const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
+;// CONCATENATED MODULE: external "node:path"
+const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
 var core = __nccwpck_require__(2186);
 // EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
@@ -27141,9 +27141,9 @@ const metadataFileName = "cache-metadata.json";
 function resolveHome(filepath) {
     // Ugly, but should work
     const home = process.env.HOME || "~";
-    const pathParts = filepath.split(external_path_.sep);
+    const pathParts = filepath.split(external_node_path_namespaceObject.sep);
     if (pathParts.length > 1 && pathParts[0] === "~") {
-        return external_path_.join(home, ...pathParts.slice(1));
+        return external_node_path_namespaceObject.join(home, ...pathParts.slice(1));
     }
     return filepath;
 }
@@ -27155,7 +27155,7 @@ async function sudoMkdirP(path) {
     const userColonGroup = `${uid}:${gid}`;
     const anc = ancestors(path);
     for (const p of anc) {
-        if (external_fs_.existsSync(p))
+        if (external_node_fs_namespaceObject.existsSync(p))
             continue;
         await lib_exec.exec("sudo", ["mkdir", p]);
         await lib_exec.exec("sudo", ["chown", userColonGroup, p]);
@@ -27163,10 +27163,10 @@ async function sudoMkdirP(path) {
 }
 function ancestors(filepath) {
     const res = [];
-    let norm = external_path_.normalize(filepath);
+    let norm = external_node_path_namespaceObject.normalize(filepath);
     while (norm !== "." && norm !== "/") {
         res.unshift(norm);
-        const next = external_path_.dirname(norm);
+        const next = external_node_path_namespaceObject.dirname(norm);
         if (next === norm)
             break;
         norm = next;
@@ -27178,26 +27178,26 @@ async function getCacheUtil(cachePath) {
         silent: true,
         ignoreReturnCode: true,
     });
-    const cacheUtil = parseInt(stdout.trim());
+    const cacheUtil = Number.parseInt(stdout.trim());
     return cacheUtil;
 }
 function ensureCacheMetadata(cachePath) {
-    const namespaceFolderPath = external_path_.join(cachePath, privateNamespaceDir);
-    external_fs_.mkdirSync(namespaceFolderPath, { recursive: true });
-    const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
-    if (!external_fs_.existsSync(metadataFilePath)) {
+    const namespaceFolderPath = external_node_path_namespaceObject.join(cachePath, privateNamespaceDir);
+    external_node_fs_namespaceObject.mkdirSync(namespaceFolderPath, { recursive: true });
+    const metadataFilePath = external_node_path_namespaceObject.join(namespaceFolderPath, metadataFileName);
+    if (!external_node_fs_namespaceObject.existsSync(metadataFilePath)) {
         return {};
     }
-    const rawData = external_fs_.readFileSync(metadataFilePath, "utf8");
+    const rawData = external_node_fs_namespaceObject.readFileSync(metadataFilePath, "utf8");
     const metadata = JSON.parse(rawData);
     return metadata;
 }
 function writeCacheMetadata(cachePath, metadata) {
-    const namespaceFolderPath = external_path_.join(cachePath, privateNamespaceDir);
-    external_fs_.mkdirSync(namespaceFolderPath, { recursive: true });
-    const metadataFilePath = external_path_.join(namespaceFolderPath, metadataFileName);
+    const namespaceFolderPath = external_node_path_namespaceObject.join(cachePath, privateNamespaceDir);
+    external_node_fs_namespaceObject.mkdirSync(namespaceFolderPath, { recursive: true });
+    const metadataFilePath = external_node_path_namespaceObject.join(namespaceFolderPath, metadataFileName);
     const rawData = JSON.stringify(metadata);
-    external_fs_.writeFileSync(metadataFilePath, rawData, { mode: 0o666 });
+    external_node_fs_namespaceObject.writeFileSync(metadataFilePath, rawData, { mode: 0o666 });
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
@@ -27263,7 +27263,7 @@ async function main() {
 async function restoreLocalCache(cachePaths) {
     const cacheMisses = [];
     for (const p of cachePaths) {
-        if (!external_fs_.existsSync(p.pathInCache)) {
+        if (!external_node_fs_namespaceObject.existsSync(p.pathInCache)) {
             cacheMisses.push(p.mountTarget);
         }
         if (p.wipe) {
@@ -27289,7 +27289,7 @@ async function resolveCachePaths(localCachePath) {
     }
     for (const p of paths) {
         const expandedFilePath = resolveHome(p.mountTarget);
-        const fileCachedPath = external_path_.join(localCachePath, expandedFilePath);
+        const fileCachedPath = external_node_path_namespaceObject.join(localCachePath, expandedFilePath);
         p.pathInCache = fileCachedPath;
     }
     return paths;

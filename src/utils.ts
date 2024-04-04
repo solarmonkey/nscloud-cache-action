@@ -1,6 +1,6 @@
-import * as path from "path";
+import * as path from "node:path";
 import * as exec from "@actions/exec";
-import * as fs from "fs";
+import * as fs from "node:fs";
 
 export const Env_CacheRoot = "NSC_CACHE_PATH";
 export const StatePathsKey = "paths";
@@ -61,7 +61,7 @@ export async function getCacheUtil(cachePath: string): Promise<number> {
       ignoreReturnCode: true,
     }
   );
-  const cacheUtil = parseInt(stdout.trim());
+  const cacheUtil = Number.parseInt(stdout.trim());
   return cacheUtil;
 }
 
