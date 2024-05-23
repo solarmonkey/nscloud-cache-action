@@ -27356,6 +27356,10 @@ async function resolveCacheMode(cacheMode) {
             const composerCache = await getExecStdout("composer config --global cache-files-dir");
             return [{ mountTarget: composerCache, framework: cacheMode }];
         }
+        case "poetry": {
+            const poetryCache = await getExecStdout("poetry config cache-dir");
+            return [{ mountTarget: poetryCache, framework: cacheMode }];
+        }
         default:
             core.warning(`Unknown cache option: ${cacheMode}.`);
             return [];

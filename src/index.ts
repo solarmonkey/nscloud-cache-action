@@ -194,6 +194,11 @@ async function resolveCacheMode(cacheMode: string): Promise<utils.CachePath[]> {
       return [{ mountTarget: composerCache, framework: cacheMode }];
     }
 
+    case "poetry": {
+      const poetryCache = await getExecStdout("poetry config cache-dir");
+      return [{ mountTarget: poetryCache, framework: cacheMode }];
+    }
+
     default:
       core.warning(`Unknown cache option: ${cacheMode}.`);
       return [];
