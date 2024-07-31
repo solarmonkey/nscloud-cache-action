@@ -18,7 +18,11 @@ async function main() {
   const localCachePath = process.env[utils.Env_CacheRoot];
   if (localCachePath == null) {
     throw new Error(
-      "Local cache not found. Did you configure the runs-on labels to enable Namespace cross-invocation cache?"
+      `Local cache path not found.
+      
+Did you configure the Namespace cross-invocation cache? https://namespace.so/docs/features/faster-github-actions#using-a-cache-volume
+
+Are you running in a container? Check out https://namespace.so/docs/actions/nscloud-cache-action#advanced-running-github-jobs-in-containers`
     );
   }
   core.info(`Found Namespace cross-invocation cache at ${localCachePath}.`);
