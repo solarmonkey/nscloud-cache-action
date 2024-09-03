@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "node:fs";
 
@@ -34,8 +35,31 @@ export async function sudoMkdirP(path: string) {
 
   const anc = ancestors(path);
   for (const p of anc) {
-    if (fs.existsSync(p)) continue;
-    await exec.exec("sudo", ["mkdir", p]);
+    if (fs.existsSync(p)) {
+      core.debug(`${p} already exists`);
+      continue;
+    }
+
+    const { exitCode, stderr } = await exec.getExecOutput(
+      "sudo",
+      ["mkdir", p],
+      {
+        silent: true,
+        ignoreReturnCode: true,
+      }
+    );
+
+    if (exitCode > 0) {
+      // Sadly, the exit code is 1 and we cannot match for EEXIST in case of concurrent directory creation.
+      if (fs.existsSync(p)) {
+        core.debug(`${p} was concurrently created`);
+        continue;
+      }
+
+      core.info(stderr);
+      throw new Error(`'sudo mkdir ${p}' failed with exit code ${exitCode}`);
+    }
+
     await exec.exec("sudo", ["chown", userColonGroup, p]);
   }
 }

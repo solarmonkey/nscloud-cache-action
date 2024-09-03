@@ -27134,6 +27134,7 @@ var io = __nccwpck_require__(7436);
 
 
 
+
 const Env_CacheRoot = "NSC_CACHE_PATH";
 const StatePathsKey = "paths";
 const privateNamespaceDir = ".ns";
@@ -27155,9 +27156,23 @@ async function sudoMkdirP(path) {
     const userColonGroup = `${uid}:${gid}`;
     const anc = ancestors(path);
     for (const p of anc) {
-        if (external_node_fs_namespaceObject.existsSync(p))
+        if (external_node_fs_namespaceObject.existsSync(p)) {
+            core.debug(`${p} already exists`);
             continue;
-        await lib_exec.exec("sudo", ["mkdir", p]);
+        }
+        const { exitCode, stderr } = await lib_exec.getExecOutput("sudo", ["mkdir", p], {
+            silent: true,
+            ignoreReturnCode: true,
+        });
+        if (exitCode > 0) {
+            // Sadly, the exit code is 1 and we cannot match for EEXIST in case of concurrent directory creation.
+            if (external_node_fs_namespaceObject.existsSync(p)) {
+                core.debug(`${p} was concurrently created`);
+                continue;
+            }
+            core.info(stderr);
+            throw new Error(`'sudo mkdir ${p}' failed with exit code ${exitCode}`);
+        }
         await lib_exec.exec("sudo", ["chown", userColonGroup, p]);
     }
 }
